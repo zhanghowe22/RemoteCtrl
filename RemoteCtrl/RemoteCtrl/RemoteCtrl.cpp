@@ -6,6 +6,8 @@
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
 #include <direct.h>
+#include <io.h>
+#include <list>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -36,6 +38,19 @@ void Dump(BYTE* pData, size_t nSize) {
     OutputDebugStringA(strOut.c_str());
 }
 
+typedef struct file_info{
+    file_info() {
+        isInvalid = 0;
+        isDirectory = -1;
+        hasNext = 1;
+        memset(szFileName, 0, sizeof(szFileName));
+    }
+    bool isInvalid;  // 是否有效
+    bool isDirectory; // 是否为目录 0 否 1 是
+    bool hasNext;    // 是否还有后续 0 没有 1 有
+    char szFileName[256]; // 文件名
+}FILEINFO,*PFILEINFO;
+
 // 获取磁盘信息，发送给控制端
 int MakeDirverInfo() { 
     std::string result;
@@ -54,6 +69,52 @@ int MakeDirverInfo() {
     Dump((BYTE*)pack.Data(), pack.Size());
     // CServerSocket::getInstance()->Send(pack);
 
+    return 0;
+}
+
+// 获取目录
+int MakeDirectoryInfo()
+{
+    std::string strPath;
+    // std::list<FILEINFO> lsFileInfos;
+
+    if (CServerSocket::getInstance()->GetFilePath(strPath) == false) {
+        OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误！！"));
+        return -1;
+    }
+
+    if (_chdir(strPath.c_str()) != 0) {
+        FILEINFO finfo;
+        finfo.isInvalid = true;
+        finfo.isDirectory = true;
+        finfo.hasNext = false;
+        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+        // lsFileInfos.push_back(finfo);
+
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
+
+        OutputDebugString(_T("没有权限，访问目录！！"));
+        return -2;
+    }
+
+    _finddata_t fdata;
+    int hfind = 0;
+    if ((hfind = _findfirst("*", &fdata)) == -1) {
+        OutputDebugString(_T("没有找到任何文件！！"));
+        return -3;
+    }
+
+    do {
+        FILEINFO finfo;
+        finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+        memcpy(finfo.szFileName, fdata.name, sizeof(fdata.name));
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
+		CServerSocket::getInstance()->Send(pack);
+    } while (!_findnext(hfind, &fdata));
+
+    FILEINFO finfo;
+    finfo.hasNext = false;
     return 0;
 }
 
@@ -79,6 +140,10 @@ int main()
             {
             case 1: // 查看磁盘分区
                 MakeDirverInfo();
+                break;
+
+            case 2: // 查看指定目录
+                MakeDirectoryInfo();
                 break;
 
             default:
