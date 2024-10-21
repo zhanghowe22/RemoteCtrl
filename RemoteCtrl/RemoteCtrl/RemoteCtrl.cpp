@@ -9,6 +9,10 @@
 #include <io.h>
 #include <list>
 #include <atlimage.h>
+#include "LockDialog.h"
+
+CLockDialog dlg;
+unsigned threadid = 0;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -323,6 +327,7 @@ int SendScreen()
         SIZE_T nSize = GlobalSize(hMem);
 
         CPacket pack(6, pData, nSize);
+        CServerSocket::getInstance()->Send(pack);
 
         GlobalUnlock(hMem);
 
@@ -344,6 +349,86 @@ int SendScreen()
     return 0;
 }
 
+unsigned _stdcall threadLockDlg(void* arg)
+{
+    TRACE("%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+	// 创建锁机提示框，非模态显示
+	dlg.Create(IDD_DIALOG_INFO, NULL);
+
+	dlg.ShowWindow(SW_SHOW);
+
+	// 弹窗全屏显示，遮蔽后台窗口
+	CRect rect;
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+	rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+	rect.bottom *= 1.03;
+	dlg.MoveWindow(rect);
+
+	// 弹窗置顶
+	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+
+	// 弹窗内的光标不显示
+	ShowCursor(false);
+	// 隐藏window任务栏
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);
+
+	// 限制鼠标活动范围在提示框内
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = 1;
+	rect.bottom = 1;
+	ClipCursor(rect);
+
+	// MFC的消息循环
+	MSG msg;
+	while (GetMessage(&msg, NULL, 0, 0))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+
+		// 按下a键退出锁机弹窗
+		if (msg.message == WM_KEYDOWN) {
+			TRACE("msg:%08X wparam:%08X lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+			if (msg.wParam == 0x41) { // a: 0x41; esc: 0x1B
+				break;
+			}
+		}
+	}
+
+	// 恢复光标
+	ShowCursor(true);
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
+
+    _endthreadex(0);
+
+    dlg.DestroyWindow();
+
+    return 0;
+}
+
+int LockMachine()
+{
+    if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {
+        // 使用线程处理，防止在显示弹窗的死循环中出不来，接收不到后续指令
+        // _beginthread(threadLockDlg, 0, NULL);
+        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid);
+        TRACE("threadid = %d\r\n", threadid);
+    }
+	CPacket pack(7, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
+	return 0;
+}
+
+int UnlockMachine()
+{
+    PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);
+	CPacket pack(7, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -361,7 +446,7 @@ int main()
         }
         else
         {
-            int nCmd = 6;
+            int nCmd = 7;
             switch (nCmd)
             {
             case 1: // 查看磁盘分区
@@ -388,11 +473,25 @@ int main()
                 SendScreen();
                 break;
 
+            case 7: // 锁机
+                LockMachine();
+                break;
+
+            case 8: // 解锁
+                UnlockMachine();
+                break;
+
             default:
                 break;
             }
+            Sleep(5000);
+            UnlockMachine();
+            TRACE("m_hWnd = %08X\r\n", dlg.m_hWnd);
+            while (dlg.m_hWnd != NULL)
+            {
+                Sleep(10);
+            }
             
-
         //             CServerSocket* pserver = CServerSocket::getInstance();
         // 
         //             int count = 0;
@@ -415,10 +514,7 @@ int main()
         //                 }
         // 
         //                 int ret = pserver->DealCommand();
-        //            }
-
-
-           
+        //            }   
         }
     }
     else
