@@ -53,7 +53,7 @@ public:
 			}
 		}
 
-		if (i + 4 + 2 + 2 >= nSize) { // 包数据可能不全，或者包头未能全部接收到
+		if (i + 4 + 2 + 2 > nSize) { // 包数据可能不全，或者包头未能全部接收到
 			nSize = 0;
 			return;
 		}
@@ -158,7 +158,7 @@ public:
 		return m_instance;
 	}
 
-	bool InitSocket(const std::string& strIPAddress)
+	bool InitSocket(int nIp, int nPort)
 	{
 		if (m_sock != INVALID_SOCKET) {
 			CloseSocket();
@@ -171,8 +171,11 @@ public:
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		serv_adr.sin_addr.s_addr = inet_addr(strIPAddress.c_str());
-		serv_adr.sin_port = htons(9527);
+
+		// TRACE("addr: %08X nIp = %08X\r\n", inet_addr("127.0.0.1"), nIp);
+
+		serv_adr.sin_addr.s_addr = htonl(nIp);
+		serv_adr.sin_port = htons(nPort);
 
 		int ret = connect(m_sock, (sockaddr*)&serv_adr, sizeof(serv_adr));
 
