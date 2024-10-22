@@ -429,6 +429,65 @@ int UnlockMachine()
     return 0;
 }
 
+int TestConnect()
+{
+    CPacket pack(1981, NULL, 0);
+
+	bool ret = CServerSocket::getInstance()->Send(pack);
+
+    TRACE("Send ret = %d\r\n", ret);
+
+	return 0;
+}
+
+int ExcuteCommand(int nCmd)
+{
+    int ret = 0;
+	switch (nCmd)
+	{
+	case 1: // 查看磁盘分区
+        ret = MakeDirverInfo();
+		break;
+
+	case 2: // 查看指定目录
+        ret = MakeDirectoryInfo();
+		break;
+
+	case 3: // 打开文件
+        ret = RunFile();
+		break;
+
+	case 4: // 下载文件
+        ret = DownloadFile();
+		break;
+
+	case 5: // 鼠标操作
+        ret = MouseEvent();
+		break;
+
+	case 6: // 获取屏幕信息 ==》 发送屏幕截图
+        ret = SendScreen();
+		break;
+
+	case 7: // 锁机
+        ret = LockMachine();
+		break;
+
+	case 8: // 解锁
+        ret = UnlockMachine();
+		break;
+
+    case 1981:
+        ret = TestConnect();
+        break;
+
+	default:
+		break;
+	}
+
+    return ret;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -445,78 +504,43 @@ int main()
             nRetCode = 1;
         }
         else
-        {
-            int nCmd = 7;
-            switch (nCmd)
-            {
-            case 1: // 查看磁盘分区
-                MakeDirverInfo();
-                break;
+        {      
+			CServerSocket* pserver = CServerSocket::getInstance();
 
-            case 2: // 查看指定目录
-                MakeDirectoryInfo();
-                break;
+			int count = 0;
 
-            case 3: // 打开文件
-                RunFile();
-                break;
+			if (pserver->InitSocket() == false) {
+				MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+				exit(0);
+			}
 
-            case 4: // 下载文件
-                DownloadFile();
-                break;
+			while (CServerSocket::getInstance() != NULL) {
+				if (pserver->AcceptClient() == false) {
+					if (count >= 3) {
+						MessageBox(NULL, _T("多次无法正常接入用户，结束程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+						exit(0);
+					}
 
-            case 5: // 鼠标操作
-                MouseEvent();
-                break;
+					MessageBox(NULL, _T("无法正常接入用户，自动重试！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
 
-            case 6: // 获取屏幕信息 ==》 发送屏幕截图
-                SendScreen();
-                break;
+					count++;
+				}
+                TRACE("AcceptClient return ture\r\n");
+				int ret = pserver->DealCommand();
+                TRACE("DealCommand ret %d\r\n", ret);
+                if (ret > 0) {
+                    ret = ExcuteCommand(ret);
+                    if (ret != 0) {
+                        TRACE("执行命令失败：%d ret = %d\r\n", pserver->GetPacket().sCmd, ret);
+                    }
 
-            case 7: // 锁机
-                LockMachine();
-                break;
-
-            case 8: // 解锁
-                UnlockMachine();
-                break;
-
-            default:
-                break;
-            }
-            Sleep(5000);
-            UnlockMachine();
-            TRACE("m_hWnd = %08X\r\n", dlg.m_hWnd);
-            while (dlg.m_hWnd != NULL)
-            {
-                Sleep(10);
-            }
-            
-        //             CServerSocket* pserver = CServerSocket::getInstance();
-        // 
-        //             int count = 0;
-        // 
-        // 			if (pserver->InitSocket() == false) {
-        // 				MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
-        // 				exit(0);
-        // 			}
-        // 
-        //             while (CServerSocket::getInstance() != NULL) {
-        //                 if (pserver->AcceptClient() == false) {
-        //                     if (count >= 3) {
-        //                         MessageBox(NULL, _T("多次无法正常接入用户，结束程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-        //                         exit(0);
-        //                     }
-        // 
-        //                     MessageBox(NULL, _T("无法正常接入用户，自动重试！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-        // 
-        //                     count++;
-        //                 }
-        // 
-        //                 int ret = pserver->DealCommand();
-        //            }   
-        }
-    }
+                    // 服务端和客户端通信的数据量很小  使用短连接             
+                    pserver->CloseClient();
+                    TRACE("Command has done!\r\n");
+                }              
+			}
+		}
+	}
     else
     {
         // TODO: 更改错误代码以符合需要

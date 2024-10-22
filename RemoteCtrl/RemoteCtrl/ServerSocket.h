@@ -49,7 +49,7 @@ public:
 			}
 		}
 
-		if (i + 4 + 2 + 2 >= nSize) { // 包数据可能不全，或者包头未能全部接收到
+		if (i + 4 + 2 + 2 > nSize) { // 包数据可能不全，或者包头未能全部接收到
 			nSize = 0;
 			return;
 		}
@@ -174,9 +174,11 @@ public:
 	}
 
 	bool AcceptClient() {
+		TRACE("Enter AcceptClient\r\n");
 		sockaddr_in client_adr;
 		int cli_sz = sizeof(client_adr);
 		m_client = accept(m_sock, (sockaddr*)&client_adr, &cli_sz);
+		TRACE("m_client = %d\r\n", m_client);
 		if (m_client == -1) {
 			return false;
 		}
@@ -188,6 +190,10 @@ public:
 		if (m_client == -1) return -1;
 
 		char* buffer = new char[BUFFER_SIZE]; // 4k的
+		if (buffer == NULL) {
+			TRACE("内存不足！\r\n");
+			return -2;
+		}
 		memset(buffer, 0, BUFFER_SIZE);
 
 		size_t index = 0; // buffer缓存的索引
@@ -196,19 +202,26 @@ public:
 		{
 			size_t len = recv(m_client, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
+				delete[] buffer;
 				return -1;
 			}
+
+			TRACE("recv %d\r\n", len);
 
 			index += len;
 			len = index;
 
 			m_packet = CPacket((BYTE*)buffer, len);
+			
 			if (len > 0) {
 				memmove(buffer, buffer + len, BUFFER_SIZE - len); // 将buffer中未解析的内容移到开头
 				index -= len;
+				delete[] buffer;
+				TRACE("sCmd = %d\r\n", m_packet.sCmd);
 				return m_packet.sCmd;
 			}
 		}
+		delete[] buffer;
 		return -1;
 	}
 
@@ -237,6 +250,15 @@ public:
 			return true;
 		}
 		return false;
+	}
+
+	CPacket& GetPacket() {
+		return m_packet;
+	}
+
+	void CloseClient() {
+		closesocket(m_client);
+		m_client = INVALID_SOCKET;
 	}
 
 private:
