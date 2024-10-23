@@ -43,19 +43,6 @@ void Dump(BYTE* pData, size_t nSize) {
     OutputDebugStringA(strOut.c_str());
 }
 
-typedef struct file_info{
-    file_info() {
-        isInvalid = 0;
-        isDirectory = -1;
-        hasNext = 1;
-        memset(szFileName, 0, sizeof(szFileName));
-    }
-    bool isInvalid;  // 是否有效
-    bool isDirectory; // 是否为目录 0 否 1 是
-    bool hasNext;    // 是否还有后续 0 没有 1 有
-    char szFileName[256]; // 文件名
-}FILEINFO,*PFILEINFO;
-
 // 获取磁盘信息，发送给控制端
 int MakeDirverInfo() { 
     std::string result;

@@ -67,7 +67,7 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_TREE_DIR, m_Tree);
 }
 
-int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData /*= NULL*/, size_t nLength /*= 0*/)
+int CRemoteClientDlg::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData /*= NULL*/, size_t nLength /*= 0*/)
 {
 	UpdateData();
 	CClientSocket* pClient = CClientSocket::getInstance();
@@ -86,7 +86,8 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData /*= NULL*/, size_t
 
 	TRACE("ack:%d\r\n", cmd);
 
-	pClient->CloseSocket();
+	if(bAutoClose)
+		pClient->CloseSocket();
 
 	return cmd;
 }
@@ -97,6 +98,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
+	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -220,4 +222,62 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		}
 		dr += drivers[i];
 	}
+}
+
+
+CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
+{
+	CString strRet, strTmp;
+	do
+	{
+		strTmp = m_Tree.GetItemText(hTree);
+
+		strRet += strTmp + '\\' + strRet;
+
+		hTree = m_Tree.GetParentItem(hTree);
+
+	} while (hTree != NULL);
+
+	return strRet;
+}
+
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+
+	CPoint ptMouse;
+	GetCursorPos(&ptMouse);
+	m_Tree.ScreenToClient(&ptMouse);
+
+	// 判断双击是否点击在节点上
+	HTREEITEM HTreeSelected = m_Tree.HitTest(ptMouse, 0);
+	if (HTreeSelected == NULL) {
+		return;
+	}
+
+	// 点到节点上时，拼接完整路径
+	CString strPath = GetPath(HTreeSelected);
+
+	// 将路径发送到受控端
+	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+
+	// 接收受控端返回的信息
+	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
+
+	CClientSocket* pClient = CClientSocket::getInstance();
+	do 
+	{
+		m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
+		int cmd = pClient->DealCommand();
+
+		TRACE("ack:%d\r\n", cmd);
+		if (cmd < 0) break;
+
+		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
+
+	} while (pInfo->hasNext);
+
+	
+	pClient->CloseSocket();
+
 }
