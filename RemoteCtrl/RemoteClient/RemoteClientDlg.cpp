@@ -216,7 +216,8 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	for (size_t i = 0; i < drivers.size(); i++) {
 		if (drivers[i] == ',') {
 			dr += ":";
-			m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+			HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+			m_Tree.InsertItem("", hTemp, TVI_LAST);
 			dr.clear();
 			continue;
 		}
@@ -241,6 +242,18 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	return strRet;
 }
 
+void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
+{
+	HTREEITEM hSub = NULL;
+
+	do
+	{
+		hSub = m_Tree.GetChildItem(hTree);
+		if (hSub != NULL) m_Tree.DeleteItem(hSub);
+	} while (hSub);
+}
+
+
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
@@ -255,6 +268,11 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 		return;
 	}
 
+	if (m_Tree.GetChildItem(HTreeSelected) == NULL)
+		return;
+
+	DeleteTreeChildrenItem(HTreeSelected);
+
 	// 点到节点上时，拼接完整路径
 	CString strPath = GetPath(HTreeSelected);
 
@@ -262,18 +280,33 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 
 	// 接收受控端返回的信息
-	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
+	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 
 	CClientSocket* pClient = CClientSocket::getInstance();
 	while (pInfo->hasNext)
 	{
-		m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
+		TRACE("[%s] isDir %d\r\n", pInfo->szFileName, pInfo->isDirectory);
+		if (pInfo->isDirectory) {
+			if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
+				int cmd = pClient->DealCommand();
+				TRACE("ack:%d\r\n", cmd);
+				if (cmd < 0) break;
+				pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+				continue;
+			}
+		}
+
+		HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
+		if (pInfo->isDirectory) {
+			m_Tree.InsertItem("", hTemp, TVI_LAST);
+		}
+		
 		int cmd = pClient->DealCommand();
 
 		TRACE("ack:%d\r\n", cmd);
 		if (cmd < 0) break;
 
-		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
+		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 
 	}
 

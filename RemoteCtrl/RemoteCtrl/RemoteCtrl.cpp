@@ -350,7 +350,7 @@ unsigned _stdcall threadLockDlg(void* arg)
 	rect.top = 0;
 	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
 	rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
-	rect.bottom *= 1.03;
+	rect.bottom = LONG(rect.bottom * 1.03);
 	dlg.MoveWindow(rect);
 
 	// 弹窗置顶

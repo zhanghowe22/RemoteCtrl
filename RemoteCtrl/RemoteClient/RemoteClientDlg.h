@@ -35,6 +35,8 @@ private:
 	*/
 	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
 
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
+
 // 实现
 protected:
 	HICON m_hIcon;
