@@ -77,12 +77,7 @@ int MakeDirectoryInfo()
 
     if (_chdir(strPath.c_str()) != 0) {
         FILEINFO finfo;
-        finfo.isInvalid = true;
-        finfo.isDirectory = true;
         finfo.hasNext = false;
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
-        // lsFileInfos.push_back(finfo);
-
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
 
@@ -94,6 +89,11 @@ int MakeDirectoryInfo()
     int hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到任何文件！！"));
+        FILEINFO finfo;
+        finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+        memcpy(finfo.szFileName, fdata.name, sizeof(fdata.name));
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
+        CServerSocket::getInstance()->Send(pack);
         return -3;
     }
 

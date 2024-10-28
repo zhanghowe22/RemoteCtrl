@@ -265,7 +265,7 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
 
 	CClientSocket* pClient = CClientSocket::getInstance();
-	do 
+	while (pInfo->hasNext)
 	{
 		m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
 		int cmd = pClient->DealCommand();
@@ -275,9 +275,8 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().Data();
 
-	} while (pInfo->hasNext);
+	}
 
-	
 	pClient->CloseSocket();
 
 }
