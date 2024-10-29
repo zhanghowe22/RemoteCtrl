@@ -77,7 +77,7 @@ int MakeDirectoryInfo()
 
     if (_chdir(strPath.c_str()) != 0) {
         FILEINFO finfo;
-        finfo.hasNext = false;
+        finfo.hasNext = FALSE;
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
 
@@ -86,12 +86,11 @@ int MakeDirectoryInfo()
     }
 
     _finddata_t fdata;
-    int hfind = 0;
+    intptr_t hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到任何文件！！"));
         FILEINFO finfo;
-        finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
-        memcpy(finfo.szFileName, fdata.name, sizeof(fdata.name));
+        finfo.hasNext = false;
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
         CServerSocket::getInstance()->Send(pack);
         return -3;
@@ -100,13 +99,15 @@ int MakeDirectoryInfo()
     do {
         FILEINFO finfo;
         finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
-        memcpy(finfo.szFileName, fdata.name, sizeof(fdata.name));
+        memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
 		CServerSocket::getInstance()->Send(pack);
-    } while (!_findnext(hfind, &fdata));
+    } while (_findnext(hfind, &fdata) == 0);
 
     FILEINFO finfo;
     finfo.hasNext = false;
+	CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+	CServerSocket::getInstance()->Send(pack);
     return 0;
 }
 

@@ -65,6 +65,7 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_IPAddress(pDX, IDC_IPADDRESS_SERV, m_server_address);
 	DDX_Text(pDX, IDC_EDIT_PORT, m_nPort);
 	DDX_Control(pDX, IDC_TREE_DIR, m_Tree);
+	DDX_Control(pDX, IDC_LIST_FILE, m_List);
 }
 
 int CRemoteClientDlg::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData /*= NULL*/, size_t nLength /*= 0*/)
@@ -99,6 +100,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
+	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -253,11 +255,8 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 	} while (hSub);
 }
 
-
-void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+void CRemoteClientDlg::LoadFileInfo()
 {
-	*pResult = 0;
-
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse);
 	m_Tree.ScreenToClient(&ptMouse);
@@ -272,6 +271,7 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 		return;
 
 	DeleteTreeChildrenItem(HTreeSelected);
+	m_List.DeleteAllItems();
 
 	// 点到节点上时，拼接完整路径
 	CString strPath = GetPath(HTreeSelected);
@@ -294,13 +294,13 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 				pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 				continue;
 			}
-		}
-
-		HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
-		if (pInfo->isDirectory) {
+			HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
 			m_Tree.InsertItem("", hTemp, TVI_LAST);
 		}
-		
+		else {
+			m_List.InsertItem(0, pInfo->szFileName);
+		}
+
 		int cmd = pClient->DealCommand();
 
 		TRACE("ack:%d\r\n", cmd);
@@ -311,5 +311,20 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 
 	pClient->CloseSocket();
+}
 
+// 双击
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+
+	LoadFileInfo();
+}
+
+// 单击
+void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+
+	LoadFileInfo();
 }
