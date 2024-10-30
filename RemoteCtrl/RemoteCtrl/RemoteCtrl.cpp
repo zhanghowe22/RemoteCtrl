@@ -102,6 +102,7 @@ int MakeDirectoryInfo()
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
 		CServerSocket::getInstance()->Send(pack);
+        // TRACE("Server send file name is: %s %d \r\n", finfo.szFileName, finfo.hasNext);
     } while (_findnext(hfind, &fdata) == 0);
 
     FILEINFO finfo;

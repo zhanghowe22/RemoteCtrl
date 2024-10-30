@@ -101,6 +101,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
+	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 END_MESSAGE_MAP()
 
 
@@ -214,16 +215,18 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	std::string drivers = pClient->GetPacket().strData;
 	std::string dr; // 临时变量
 	m_Tree.DeleteAllItems();
+	HTREEITEM hTemp;
 
-	for (size_t i = 0; i < drivers.size(); i++) {
-		if (drivers[i] == ',') {
+	for (size_t i = 0; i <= drivers.size(); i++) {
+		if (i == drivers.size() || drivers[i] == ',') {
 			dr += ":";
-			HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+			hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
 			m_Tree.InsertItem("", hTemp, TVI_LAST);
 			dr.clear();
-			continue;
 		}
-		dr += drivers[i];
+		else {
+			dr += drivers[i];
+		}
 	}
 }
 
@@ -295,6 +298,7 @@ void CRemoteClientDlg::LoadFileInfo()
 				continue;
 			}
 			HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
+			// TRACE("Client recv file name is: %s\r\n", pInfo->szFileName);
 			m_Tree.InsertItem("", hTemp, TVI_LAST);
 		}
 		else {
@@ -327,4 +331,28 @@ void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 0;
 
 	LoadFileInfo();
+}
+
+
+void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+
+	CPoint ptMouse, ptList;
+	GetCursorPos(&ptMouse);
+
+	ptList = ptMouse;
+	m_List.ScreenToClient(&ptList);
+
+	int ListSelected = m_List.HitTest(ptList);
+	if (ListSelected < 0) return;
+
+	CMenu menu;
+	menu.LoadMenu(IDR_MENU_RCLICK);
+	CMenu* pPupup = menu.GetSubMenu(0);
+	if (pPupup != NULL) {
+		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTALIGN, ptMouse.x, ptMouse.y, this);
+	}
 }
