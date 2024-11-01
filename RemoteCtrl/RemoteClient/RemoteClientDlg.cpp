@@ -238,7 +238,10 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	{
 		strTmp = m_Tree.GetItemText(hTree);
 
-		strRet += strTmp + '\\' + strRet;
+		if (strRet.IsEmpty())
+			strRet = strTmp;
+		else
+			strRet = strTmp + '\\' + strRet;
 
 		hTree = m_Tree.GetParentItem(hTree);
 
@@ -298,20 +301,23 @@ void CRemoteClientDlg::LoadFileInfo()
 				continue;
 			}
 			HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
-			// TRACE("Client recv file name is: %s\r\n", pInfo->szFileName);
+			TRACE("Client recv dir name is: %s\r\n", pInfo->szFileName);
 			m_Tree.InsertItem("", hTemp, TVI_LAST);
 		}
 		else {
 			m_List.InsertItem(0, pInfo->szFileName);
+			TRACE("Have next [%d]\r\n", pInfo->hasNext);
+			TRACE("Client recv file name is: %s\r\n", pInfo->szFileName);
 		}
 
 		int cmd = pClient->DealCommand();
 
-		TRACE("ack:%d\r\n", cmd);
-		if (cmd < 0) break;
+		if (cmd < 0) {
+			TRACE("Deal Command failed %d!!!\r\n", cmd);
+			break;
+		}
 
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
-
 	}
 
 	pClient->CloseSocket();
