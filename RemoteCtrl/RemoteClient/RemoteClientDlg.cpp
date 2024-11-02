@@ -385,19 +385,23 @@ void CRemoteClientDlg::OnDownloadFile()
 
 		HTREEITEM hSelected = m_Tree.GetSelectedItem();
 		strFile = GetPath(hSelected) + strFile;
+		CClientSocket* pClient = CClientSocket::getInstance();
 		TRACE("%s\r\n", LPCSTR(strFile));
 
 		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 		if (ret < 0) {
 			AfxMessageBox("执行下载命令失败!!!");
 			TRACE("执行下载命令失败：ret = %d \r\n", ret);
+			fclose(pFile);
+			pClient->CloseSocket();
 			return;
 		}
 
-		CClientSocket* pClient = CClientSocket::getInstance();
 		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
 		if (nLength == 0) {
 			AfxMessageBox("文件长度为0或者无法读取文件！！！");
+			fclose(pFile);
+			pClient->CloseSocket();
 			return;
 		}
 
