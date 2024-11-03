@@ -212,14 +212,13 @@ public:
 		if (m_sock == -1) return -1;
 
 		char* buffer = m_buffer.data(); // 4k的
-		memset(buffer, 0, BUFFER_SIZE);
 
-		size_t index = 0; // buffer缓存的索引
+		static size_t index = 0; // buffer缓存的索引
 
 		while (true)
 		{
 			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0) {
+			if ((len <= 0) && (index == 0)) {
 				return -1;
 			}
 
@@ -228,7 +227,7 @@ public:
 
 			m_packet = CPacket((BYTE*)buffer, len);
 			if (len > 0) {
-				memmove(buffer, buffer + len, BUFFER_SIZE - len); // 将buffer中未解析的内容移到开头
+				memmove(buffer, buffer + len, index - len); // 将buffer中未解析的内容移到开头
 				index -= len;
 				return m_packet.sCmd;
 			}
@@ -287,6 +286,7 @@ private:
 		}
 
 		m_buffer.resize(BUFFER_SIZE);
+		memset(m_buffer.data(), 0, BUFFER_SIZE);
 	}
 
 	CClientSocket& operator=(const CClientSocket& ss) {}
