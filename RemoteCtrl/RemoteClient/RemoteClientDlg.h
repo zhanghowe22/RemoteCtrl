@@ -28,7 +28,8 @@ private:
 
 	/*
 	* @brief 发送命令到被控端
-	* @param nCmd 命令号 1:查看磁盘分区 2:查看指定目录下文件 3:打开文件 4:下载文件
+	* @param nCmd 命令号 1:查看磁盘分区 2:查看指定目录下文件 
+	3:打开文件 4:下载文件 5:鼠标操作 6:发送屏幕内容 7:锁机 8:解锁 9:删除文件 1981:测试连接
 	* @param pData 包数据
 	* @param nLength 数据长度
 	* @return 命令号，如果小于0，则是错误
@@ -38,6 +39,8 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 
 	void LoadFileInfo();
+
+	void LoadFileCurrent();
 
 // 实现
 protected:

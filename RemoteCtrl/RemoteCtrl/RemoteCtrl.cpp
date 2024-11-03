@@ -103,7 +103,7 @@ int MakeDirectoryInfo()
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
 		CServerSocket::getInstance()->Send(pack);
         // TRACE("Server send file name is: %s %d \r\n", finfo.szFileName, finfo.hasNext);
-    } while (_findnext(hfind, &fdata) == 0);
+    } while (!_findnext(hfind, &fdata));
 
     FILEINFO finfo;
     finfo.hasNext = false;
@@ -430,6 +430,24 @@ int TestConnect()
 	return 0;
 }
 
+int DeleteLocalFile()
+{
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    TCHAR sPath[MAX_PATH] = _T("");
+
+    // mbstowcs(sPath, strPath.c_str(), strPath.size()); // 使用这种方式，中文容易乱码
+    MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), strPath.size(), 
+        sPath, sizeof(sPath) / sizeof(TCHAR)); // 936:活动代码页
+
+    DeleteFileA(strPath.c_str());
+
+    CPacket pack(9, NULL, 0);
+    bool ret = CServerSocket::getInstance()->Send(pack);
+    TRACE("Send ret = %d\r\n", ret);
+    return 0;
+}
+
 int ExcuteCommand(int nCmd)
 {
     int ret = 0;
@@ -466,6 +484,9 @@ int ExcuteCommand(int nCmd)
 	case 8: // 解锁
         ret = UnlockMachine();
 		break;
+    case 9: // 删除文件
+        ret = DeleteLocalFile();
+        break;
 
     case 1981:
         ret = TestConnect();
