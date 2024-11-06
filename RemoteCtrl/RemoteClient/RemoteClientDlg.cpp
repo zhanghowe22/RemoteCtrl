@@ -407,7 +407,7 @@ void CRemoteClientDlg::OnDownloadFile()
 
 	// 文件选择弹窗
 	CFileDialog dlg(false, "*",
-		strFile,OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, 
+		strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 		NULL, this);
 
 	if (dlg.DoModal() == IDOK) {
@@ -422,42 +422,41 @@ void CRemoteClientDlg::OnDownloadFile()
 		CClientSocket* pClient = CClientSocket::getInstance();
 		TRACE("%s\r\n", LPCSTR(strFile));
 
-		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
-		if (ret < 0) {
-			AfxMessageBox("执行下载命令失败!!!");
-			TRACE("执行下载命令失败：ret = %d \r\n", ret);
-			fclose(pFile);
-			pClient->CloseSocket();
-			return;
-		}
-
-		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
-		if (nLength == 0) {
-			AfxMessageBox("文件长度为0或者无法读取文件！！！");
-			fclose(pFile);
-			pClient->CloseSocket();
-			return;
-		}
-
-		long long nCount = 0;
-		// 接收文件并保存
-		while (nCount < nLength) {
-			ret = pClient->DealCommand();
+		do
+		{
+			int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 			if (ret < 0) {
-				AfxMessageBox("传输失败!!!");
-				TRACE("传输失败：ret = %d \r\n", ret);
+				AfxMessageBox("执行下载命令失败!!!");
+				TRACE("执行下载命令失败：ret = %d \r\n", ret);
 				break;
 			}
 
-			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
-			nCount += pClient->GetPacket().strData.size();
-		}
+			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
+			if (nLength == 0) {
+				AfxMessageBox("文件长度为0或者无法读取文件！！！");
+				break;
+			}
+
+			long long nCount = 0;
+			// 接收文件并保存
+			while (nCount < nLength) {
+				ret = pClient->DealCommand();
+				if (ret < 0) {
+					AfxMessageBox("传输失败!!!");
+					TRACE("传输失败：ret = %d \r\n", ret);
+					break;
+				}
+
+				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
+				nCount += pClient->GetPacket().strData.size();
+			}
+
+		} while (false);
+
 		fclose(pFile);
 		pClient->CloseSocket();
 	}
-
 }
-
 
 void CRemoteClientDlg::OnDeleteFile()
 {
