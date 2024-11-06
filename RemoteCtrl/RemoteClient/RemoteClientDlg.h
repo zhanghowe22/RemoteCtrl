@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "StatusDlg.h"
 
 
 // CRemoteClientDlg 对话框
@@ -42,9 +43,14 @@ private:
 
 	void LoadFileCurrent();
 
+	static void threadEntryForDownFile(void* arg);
+
+	void threadDownFile();
 // 实现
 protected:
 	HICON m_hIcon;
+
+	CStatusDlg m_dlgStatus;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
