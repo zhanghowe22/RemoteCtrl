@@ -68,9 +68,8 @@ int MakeDirverInfo() {
 int MakeDirectoryInfo()
 {
     std::string strPath;
-    // std::list<FILEINFO> lsFileInfos;
 
-    if (CServerSocket::getInstance()->GetFilePath(strPath) == false) {
+    if (!CServerSocket::getInstance()->GetFilePath(strPath)) {
         OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误！！"));
         return -1;
     }
@@ -84,10 +83,12 @@ int MakeDirectoryInfo()
         OutputDebugString(_T("没有权限，访问目录！！"));
         return -2;
     }
+    strPath.append("\\*");
 
     _finddata_t fdata;
-    intptr_t hfind = 0;
-    if ((hfind = _findfirst("*", &fdata)) == -1) {
+    intptr_t hfind = _findfirst(strPath.c_str(), &fdata);
+
+    if (hfind == -1) {
         OutputDebugString(_T("没有找到任何文件！！"));
         FILEINFO finfo;
         finfo.hasNext = false;
@@ -103,7 +104,9 @@ int MakeDirectoryInfo()
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
 		CServerSocket::getInstance()->Send(pack);
         // TRACE("Server send file name is: %s %d \r\n", finfo.szFileName, finfo.hasNext);
-    } while (!_findnext(hfind, &fdata));
+    } while (_findnext(hfind, &fdata) == 0);
+
+    _findclose(hfind);
 
     FILEINFO finfo;
     finfo.hasNext = false;
