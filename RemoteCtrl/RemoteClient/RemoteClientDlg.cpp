@@ -105,6 +105,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
+	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPakcet) // ③ 在消息映射表注册消息
 END_MESSAGE_MAP()
 
 
@@ -237,19 +238,14 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
-	CString strRet, strTmp;
-	do
-	{
-		strTmp = m_Tree.GetItemText(hTree);
+	CString strRet;
 
-		if (strRet.IsEmpty())
-			strRet = strTmp;
-		else
-			strRet = strTmp + '\\' + strRet;
-
+	// 遍历父节点并逐层插入节点文本
+	while (hTree != nullptr) {
+		CString strTmp = m_Tree.GetItemText(hTree);
+		strRet.Insert(0, strTmp + '\\');
 		hTree = m_Tree.GetParentItem(hTree);
-
-	} while (hTree != NULL);
+	}
 
 	return strRet;
 }
@@ -384,6 +380,7 @@ void CRemoteClientDlg::threadDownFile()
 		if (pFile == NULL) {
 			AfxMessageBox("本地没有权限保存该文件，或者文件无法创建！！！");
 			m_dlgStatus.ShowWindow(SW_HIDE);
+			EndWaitCursor();
 			return;
 		}
 
@@ -394,7 +391,8 @@ void CRemoteClientDlg::threadDownFile()
 
 		do
 		{
-			int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+			// int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);
 			if (ret < 0) {
 				AfxMessageBox("执行下载命令失败!!!");
 				TRACE("执行下载命令失败：ret = %d \r\n", ret);
@@ -425,6 +423,8 @@ void CRemoteClientDlg::threadDownFile()
 		pClient->CloseSocket();
 	}
 	m_dlgStatus.ShowWindow(SW_HIDE);
+	EndWaitCursor();
+	MessageBox(_T("下载完成！！！"), _T("完成"));
 }
 
 // 双击
@@ -469,12 +469,15 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CRemoteClientDlg::OnDownloadFile()
 {
-	/////// 添加线程函数
+	// 添加线程函数用来处理文件接收，防止接收大文件时主线程被阻塞
 	_beginthread(CRemoteClientDlg::threadEntryForDownFile, 0, this);
+	// 设置等待光标
+	BeginWaitCursor();
 	m_dlgStatus.m_info.SetWindowText(_T("命令正在执行中！"));
 	m_dlgStatus.ShowWindow(SW_SHOW);
+	// 居中
+	m_dlgStatus.CenterWindow(this);
 	m_dlgStatus.SetActiveWindow();
-	
 }
 
 void CRemoteClientDlg::OnDeleteFile()
@@ -506,7 +509,9 @@ void CRemoteClientDlg::OnRunFile()
 	int nSelected = m_List.GetSelectionMark();
 	CString strFile = m_List.GetItemText(nSelected, 0);
 
-	strFile = strPath + strFile;
+	strFile = strPath + + "\\" +strFile;
+
+	TRACE("Run file name is:%s\r\n", strFile);
 	int ret = SendCommandPacket(3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 
 	if (ret < 0) {
@@ -514,4 +519,12 @@ void CRemoteClientDlg::OnRunFile()
 		return;
 	}
 
+}
+
+LRESULT CRemoteClientDlg::OnSendPakcet(WPARAM wParam, LPARAM lParam)
+{
+	// ④ 实现消息响应函数
+	CString strFile = (LPCSTR)lParam;
+	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	return ret;
 }

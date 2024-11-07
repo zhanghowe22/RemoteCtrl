@@ -5,6 +5,7 @@
 #pragma once
 #include "StatusDlg.h"
 
+#define WM_SEND_PACKET (WM_USER + 1) // ①定义发送数据包的消息
 
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
@@ -72,4 +73,6 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
+
+	afx_msg LRESULT OnSendPakcet(WPARAM wParam, LPARAM lParam); // ② 定义自定义消息响应函数
 };
