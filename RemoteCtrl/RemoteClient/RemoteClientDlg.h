@@ -23,6 +23,10 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
+	CImage m_image; // 缓存
+	bool m_isFull; // 缓存是否有数据 true表示有缓存数据 false表示没有缓存数据
+
+private:
 	/*
 	* @brief 展开指定节点
 	*/ 
@@ -47,6 +51,10 @@ private:
 	static void threadEntryForDownFile(void* arg);
 
 	void threadDownFile();
+
+	static void threadEntryForWatchData(void* arg);
+
+	void threadWatchData();
 // 实现
 protected:
 	HICON m_hIcon;
