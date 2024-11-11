@@ -298,7 +298,7 @@ int SendScreen()
     int nHeight = GetDeviceCaps(hScreen, VERTRES);
 
     screen.Create(nWidth, nHeight, nBitPerPixel);
-    BitBlt(screen.GetDC(), 0, 0, 2240, 1340, hScreen, 0, 0, SRCCOPY); // 2240 * 1400分辨率
+    BitBlt(screen.GetDC(), 0, 0, 2240, 1400, hScreen, 0, 0, SRCCOPY); // 2240 * 1400分辨率
 
     ReleaseDC(NULL, hScreen);
 

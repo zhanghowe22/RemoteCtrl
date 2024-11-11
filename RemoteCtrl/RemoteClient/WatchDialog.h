@@ -21,7 +21,25 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	CPoint UserPoint2RemoteScreenPoint(CPoint& point);
 	virtual BOOL OnInitDialog();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	// 双击左键
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	// 左键按下
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	// 左键弹起
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	// 双击右键
+	afx_msg void OnRButtonDblClk(UINT nFlags, CPoint point);
+	// 右键按下
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	// 右键弹起
+	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
+	// 鼠标移动
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+
+public:
 	CStatic m_picture;
+	afx_msg void OnStnClickedWatch();
 };
