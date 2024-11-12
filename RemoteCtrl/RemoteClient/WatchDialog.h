@@ -39,7 +39,11 @@ public:
 	// 鼠标移动
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 
+	afx_msg void OnStnClickedWatch();
+
 public:
 	CStatic m_picture;
-	afx_msg void OnStnClickedWatch();
+	int m_nObjWidth;
+	int m_nObjHeight;
+	virtual void OnOK();
 };
