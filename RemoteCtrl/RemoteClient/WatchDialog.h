@@ -46,4 +46,6 @@ public:
 	int m_nObjWidth;
 	int m_nObjHeight;
 	virtual void OnOK();
+	afx_msg void OnBnClickedBtnLock();
+	afx_msg void OnBnClickedBtnUnlock();
 };
