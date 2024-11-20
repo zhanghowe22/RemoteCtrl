@@ -715,7 +715,8 @@ b 请求控制客户端
 <XPD:OBJ name="OwnedViews[15]" type="UMLAssociationView" guid="Lyh/qUEVUUqYAzpkXxElxQAA">
 <XPD:ATTR name="LineColor" type="string">clMaroon</XPD:ATTR>
 <XPD:ATTR name="FillColor" type="string">$00B9FFFF</XPD:ATTR>
-<XPD:ATTR name="Points" type="Points">280,201;404,264;461,328</XPD:ATTR>
+<XPD:ATTR name="LineStyle" type="LineStyleKind">lsRectilinear</XPD:ATTR>
+<XPD:ATTR name="Points" type="Points">280,176;404,176;404,348;460,348</XPD:ATTR>
 <XPD:REF name="Model">ZRvnnZ7AwkuQWyPPhDszyQAA</XPD:REF>
 <XPD:REF name="Head">ERFNYTvjnkuTIln4L+e46gAA</XPD:REF>
 <XPD:REF name="Tail">wLVl5KXO0kSzmoy9dhBvPgAA</XPD:REF>
@@ -883,7 +884,8 @@ b 请求控制客户端
 <XPD:OBJ name="OwnedViews[17]" type="UMLDependencyView" guid="xbucRzyBSEasmACaMgUo/gAA">
 <XPD:ATTR name="LineColor" type="string">clMaroon</XPD:ATTR>
 <XPD:ATTR name="FillColor" type="string">$00B9FFFF</XPD:ATTR>
-<XPD:ATTR name="Points" type="Points">192,208;191,272</XPD:ATTR>
+<XPD:ATTR name="LineStyle" type="LineStyleKind">lsRectilinear</XPD:ATTR>
+<XPD:ATTR name="Points" type="Points">192,208;192,272</XPD:ATTR>
 <XPD:REF name="Model">VeTdwSiCoECIolvOyvVunQAA</XPD:REF>
 <XPD:REF name="Head">CZv1X9OCMEOIHfxkDAlJWAAA</XPD:REF>
 <XPD:REF name="Tail">wLVl5KXO0kSzmoy9dhBvPgAA</XPD:REF>
@@ -909,7 +911,8 @@ b 请求控制客户端
 <XPD:OBJ name="OwnedViews[18]" type="UMLAssociationView" guid="4LALcuN2CU+1k0siMdCBdQAA">
 <XPD:ATTR name="LineColor" type="string">clMaroon</XPD:ATTR>
 <XPD:ATTR name="FillColor" type="string">$00B9FFFF</XPD:ATTR>
-<XPD:ATTR name="Points" type="Points">286,509;388,636;412,792</XPD:ATTR>
+<XPD:ATTR name="LineStyle" type="LineStyleKind">lsRectilinear</XPD:ATTR>
+<XPD:ATTR name="Points" type="Points">309,388;388,388;388,792</XPD:ATTR>
 <XPD:REF name="Model">BDA/k2qbc0aqh9bzIYQChwAA</XPD:REF>
 <XPD:REF name="Head">Xv4WA4oZBkSKhGhPJJ/TfgAA</XPD:REF>
 <XPD:REF name="Tail">CZv1X9OCMEOIHfxkDAlJWAAA</XPD:REF>
