@@ -32,40 +32,25 @@ int main()
         else
         {    
 			CCommand cmd;
-			CServerSocket* pserver = CServerSocket::getInstance();
 
-			int count = 0;
+            int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);
 
-			if (pserver->InitSocket() == false) {
+            switch (ret)
+            {
+            case -1:
 				MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
 				exit(0);
-			}
+                break;
 
-			while (CServerSocket::getInstance() != NULL) {
-				if (pserver->AcceptClient() == false) {
-					if (count >= 3) {
-						MessageBox(NULL, _T("多次无法正常接入用户，结束程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-						exit(0);
-					}
+            case -2:
+				MessageBox(NULL, _T("多次无法正常接入用户，结束程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+				exit(0);
+                break;
 
-					MessageBox(NULL, _T("无法正常接入用户，自动重试！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+            default:
+                break;
+            }
 
-					count++;
-				}
-                TRACE("AcceptClient return ture\r\n");
-				int ret = pserver->DealCommand();
-                TRACE("DealCommand ret %d\r\n", ret);
-                if (ret > 0) {
-                    ret = cmd.ExcuteCommand(ret);
-                    if (ret != 0) {
-                        TRACE("执行命令失败：%d ret = %d\r\n", pserver->GetPacket().sCmd, ret);
-                    }
-
-                    // 服务端和客户端通信的数据量很小  使用短连接             
-                    pserver->CloseClient();
-                    TRACE("Command has done!\r\n");
-                }              
-			}
 		}
 	}
     else
