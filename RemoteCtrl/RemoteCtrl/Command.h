@@ -224,10 +224,10 @@ protected:
 
 			fclose(pFile);
 		}
-
-		// 发一个空的，控制端就知道是结尾了
-		lsPacket.push_back(CPacket(4, NULL, 0));
-
+		else {
+			lsPacket.push_back(CPacket(4, NULL, 0));
+		}
+	
 		return 0;
 	}
 
