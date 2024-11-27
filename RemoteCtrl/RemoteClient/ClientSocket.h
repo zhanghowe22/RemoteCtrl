@@ -108,7 +108,7 @@ public:
 		return nLength + 6;
 	}
 
-	const char* Data() {
+	const char* Data(std::string& strOut) const{
 		strOut.resize(nLength + 6);
 
 		BYTE* pData = (BYTE*)strOut.c_str();
@@ -129,7 +129,7 @@ public:
 	std::string strData; // 包数据
 	WORD sSum;           // 和校验
 
-	std::string strOut; // 整个包的数据
+	// std::string strOut; // 整个包的数据
 };
 
 #pragma pack(pop)
@@ -171,7 +171,7 @@ public:
 		return m_instance;
 	}
 
-	bool InitSocket(int nIp, int nPort)
+	bool InitSocket()
 	{
 		if (m_sock != INVALID_SOCKET) {
 			CloseSocket();
@@ -185,10 +185,10 @@ public:
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
 
-		// TRACE("addr: %08X nIp = %08X\r\n", inet_addr("127.0.0.1"), nIp);
+		TRACE("addr: %08X nIp = %08X\r\n", inet_addr("127.0.0.1"), m_nIP);
 
-		serv_adr.sin_addr.s_addr = htonl(nIp);
-		serv_adr.sin_port = htons(nPort);
+		serv_adr.sin_addr.s_addr = htonl(m_nIP);
+		serv_adr.sin_port = htons(m_nPort);
 
 		int ret = connect(m_sock, (sockaddr*)&serv_adr, sizeof(serv_adr));
 
@@ -240,10 +240,13 @@ public:
 		return send(m_sock, pData, nSize, 0) > 0;
 	}
 
-	bool Send(CPacket& pack) {
+	bool Send(const CPacket& pack) {
 		TRACE("client m_sock = %d\r\n", m_sock);
 		if (m_sock == -1) return false;
-		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
+		std::string strOut;
+		pack.Data(strOut);
+
+		return send(m_sock, strOut.c_str(), strOut.size(), 0) > 0;
 	}
 
 	bool GetFilePath(std::string& strPath) {
@@ -272,14 +275,23 @@ public:
 		m_sock = INVALID_SOCKET;
 	}
 
+	void UpdateAddress(int nIP, int nPort) {
+		m_nIP = nIP;
+		m_nPort = nPort;
+	}
+
 private:
+	int m_nIP; // 地址
+	int m_nPort; // 端口
+
 	std::vector<char> m_buffer;
 
 	SOCKET m_sock;
 
 	CPacket m_packet;
 
-	CClientSocket() {
+	CClientSocket() : m_nIP(INADDR_ANY),m_nPort(0) {
+	
 		if (!InitSockEnv()) {
 			MessageBox(NULL, _T("无法初始化套接字环境,请检查网络设置"), _T("初始化错误！"), MB_OK | MB_ICONERROR);
 			exit(0);
@@ -293,6 +305,8 @@ private:
 
 	CClientSocket(const CClientSocket& ss) {
 		m_sock = ss.m_sock;
+		m_nIP = ss.m_nIP;
+		m_nPort = ss.m_nPort;
 	}
 
 	~CClientSocket() {

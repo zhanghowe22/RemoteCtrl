@@ -47,16 +47,6 @@ private:
 	*/ 
 	CString GetPath(HTREEITEM hTree);
 
-	/*
-	* @brief 发送命令到被控端
-	* @param nCmd 命令号 1:查看磁盘分区 2:查看指定目录下文件 
-	3:打开文件 4:下载文件 5:鼠标操作 6:发送屏幕内容 7:锁机 8:解锁 9:删除文件 1981:测试连接
-	* @param pData 包数据
-	* @param nLength 数据长度
-	* @return 命令号，如果小于0，则是错误
-	*/
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
-
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 
 	void LoadFileInfo();
@@ -100,4 +90,6 @@ public:
 	afx_msg LRESULT OnSendPakcet(WPARAM wParam, LPARAM lParam); // ② 定义自定义消息响应函数
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnNMThemeChangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditPort();
 };

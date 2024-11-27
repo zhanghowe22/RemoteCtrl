@@ -4,6 +4,7 @@
 #include "RemoteClientDlg.h"
 #include "StatusDlg.h"
 #include "resource.h"
+#include "CommonTool.h"
 #include <map>
 
 #define WM_SEND_PACK (WM_USER + 1) // 发送包数据
@@ -23,6 +24,59 @@ public:
 	int Invoke(CWnd*& pMainWnd);
 	// 发送消息
 	LRESULT SendMessage(MSG msg);
+	// 更新网络服务器的地址
+	void UpdateAddress(int nIP, int nPort) {
+		CClientSocket::getInstance()->UpdateAddress(nIP, nPort);
+	}
+
+	int DealCommand() {
+		return CClientSocket::getInstance()->DealCommand();
+	}
+
+	void CloseSocket() {
+		CClientSocket::getInstance()->CloseSocket();
+	}
+
+	bool SendPacket(const CPacket& pack) {
+		CClientSocket* pClient = CClientSocket::getInstance();
+		if (pClient->InitSocket() == false) return false;
+		pClient->Send(pack);
+	}
+
+	/*
+	* @brief 发送命令到被控端
+	* @param nCmd 命令号 1:查看磁盘分区 2:查看指定目录下文件
+	3:打开文件 4:下载文件 5:鼠标操作 6:发送屏幕内容 7:锁机 8:解锁 9:删除文件 1981:测试连接
+	* @param pData 包数据
+	* @param nLength 数据长度
+	* @return 命令号，如果小于0，则是错误
+	*/
+
+	int SendCommandPacket(
+		int nCmd, 
+		bool bAutoClose = true, 
+		BYTE* pData = NULL, 
+		size_t nLength = 0)
+	{
+		CClientSocket* pClient = CClientSocket::getInstance();
+		if (pClient->InitSocket() == false) return false;
+		pClient->Send(CPacket(nCmd, pData, nLength));
+
+		int cmd = DealCommand();
+
+		TRACE("ack:%d\r\n", cmd);
+
+		if (bAutoClose)
+			CloseSocket();
+
+		return cmd;
+	}
+
+	int GetImage(CImage& image) {
+		CClientSocket* pClient = CClientSocket::getInstance();
+
+		return CCommonTool::Bytes2Image(image, pClient->GetPacket().strData);	
+	}
 
 protected:
 	CClientController() : 

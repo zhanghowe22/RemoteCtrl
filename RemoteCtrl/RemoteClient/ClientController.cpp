@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ClientController.h"
+#include "ClientSocket.h"
 
 std::map<UINT, CClientController::MSGFUNC> 
 	CClientController::m_mapFunc;
@@ -99,12 +100,16 @@ unsigned _stdcall CClientController::threadEntry(void* arg)
 
 LRESULT CClientController::OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
-	return LRESULT();
+	CClientSocket* pClient = CClientSocket::getInstance();
+	CPacket* pPacket = (CPacket*)wParam;
+	return pClient->Send(*pPacket);
 }
 
 LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
-	return LRESULT();
+	CClientSocket* pClient = CClientSocket::getInstance();
+	char* pBuffer = (char*)wParam;
+	return pClient->Send(pBuffer, (int)lParam);
 }
 
 LRESULT CClientController::OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam)
