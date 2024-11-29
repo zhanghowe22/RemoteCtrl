@@ -80,7 +80,6 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
 
-	afx_msg LRESULT OnSendPakcet(WPARAM wParam, LPARAM lParam); // ② 定义自定义消息响应函数
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnNMThemeChangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);

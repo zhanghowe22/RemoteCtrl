@@ -84,7 +84,6 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
-	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPakcet) // ③ 在消息映射表注册消息
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_THEMECHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnNMThemeChangedIpaddressServ)
@@ -437,38 +436,6 @@ void CRemoteClientDlg::OnRunFile()
 	}
 
 }
-
-LRESULT CRemoteClientDlg::OnSendPakcet(WPARAM wParam, LPARAM lParam)
-{
-	// ④ 实现消息响应函数
-	int ret = 0;
-	int cmd = wParam >> 1;
-	switch (cmd) {
-	case 4:
-	{
-		CString strFile = (LPCSTR)lParam;
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
-	}
-	break;
-	case 5: // 鼠标操作
-	{
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
-	}
-	break;
-	case 6:
-	case 7:
-	case 8:
-	{
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, NULL, 0);
-	}
-	break;
-
-	default:
-		ret = -1;
-	}
-	return ret;
-}
-
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
