@@ -78,13 +78,43 @@ public:
 		return CCommonTool::Bytes2Image(image, pClient->GetPacket().strData);	
 	}
 
+	int DownFile(CString strPath) {
+		CFileDialog dlg(false, "*",
+			strPath, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+			NULL, &m_remoteDlg);
+
+		if (dlg.DoModal() == IDOK) {
+			m_strRemote = strPath;
+			m_strLocal = dlg.GetPathName();
+			// 添加线程函数用来处理文件接收，防止接收大文件时主线程被阻塞
+			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+
+			if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+				return -1;
+			}
+			m_remoteDlg.BeginWaitCursor();
+			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中！"));
+			m_statusDlg.ShowWindow(SW_SHOW);
+			// 居中
+			m_statusDlg.CenterWindow(&m_remoteDlg);
+			m_statusDlg.SetActiveWindow();
+		}
+
+		return 0;
+	}
+
+	void StartWatchScreen();
+
 protected:
 	CClientController() : 
 		m_statusDlg(&m_remoteDlg), 
 		m_watchDlg(&m_remoteDlg)
 	{
+		m_hThreadDownload = INVALID_HANDLE_VALUE;
 		m_hThread = INVALID_HANDLE_VALUE;
+		m_hThreadWatch = INVALID_HANDLE_VALUE;
 		m_nThreadID = -1;
+		m_isClosed = true;
 	}
 
 	~CClientController() {
@@ -109,6 +139,14 @@ protected:
 
 	LRESULT OnShowWatcher(UINT nMsg, WPARAM wParam, LPARAM lParam);
 
+	void threadDownloadFile();
+
+	static void threadDownloadEntry(void* arg);
+
+	void threadWatchScreen();
+
+	static void threadWatchEntry(void* arg);
+
 private:
 	static CClientController* m_instance;
 
@@ -117,7 +155,15 @@ private:
 	CStatusDlg m_statusDlg;
 
 	HANDLE m_hThread;
+	HANDLE m_hThreadDownload;
+	HANDLE m_hThreadWatch;
+
+	bool m_isClosed; // 监视串口是否关闭
+
 	unsigned int m_nThreadID;
+
+	CString m_strRemote; // 下载文件的远程路径
+	CString m_strLocal; // 下载文件的本地保存路径
 
 	typedef LRESULT(CClientController::* MSGFUNC) (UINT nMsg, WPARAM wParam, LPARAM lParam);
 

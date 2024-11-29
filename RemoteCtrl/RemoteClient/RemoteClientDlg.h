@@ -53,13 +53,6 @@ private:
 
 	void LoadFileCurrent();
 
-	static void threadEntryForDownFile(void* arg);
-
-	void threadDownFile();
-
-	static void threadEntryForWatchData(void* arg);
-
-	void threadWatchData();
 // 实现
 protected:
 	HICON m_hIcon;
