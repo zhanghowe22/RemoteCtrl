@@ -5,8 +5,6 @@
 #pragma once
 #include "StatusDlg.h"
 
-#define WM_SEND_PACKET (WM_USER + 1) // ①定义发送数据包的消息
-
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
 {
@@ -23,22 +21,13 @@ protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 public:
-	bool isFull() const {
-		return m_isFull;
-	}
-
 	CImage& getImage()
 	{
 		return m_image;
 	}
 
-	void SetImageStatus(bool isFull = false) {
-		m_isFull = isFull;
-	}
-
 private:
 	CImage m_image; // 缓存
-	bool m_isFull; // 缓存是否有数据 true表示有缓存数据 false表示没有缓存数据
 	bool m_isClosed; // 监视串口是否关闭
 
 private:

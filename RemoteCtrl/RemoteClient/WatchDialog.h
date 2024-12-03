@@ -9,7 +9,18 @@ class CWatchDialog : public CDialog
 
 public:
 	CWatchDialog(CWnd* pParent = nullptr);   // 标准构造函数
+
 	virtual ~CWatchDialog();
+
+	bool m_isFull; // 缓存是否有数据 true表示有缓存数据 false表示没有缓存数据
+
+	void SetImageStatus(bool isFull = false) {
+		m_isFull = isFull;
+	}
+
+	bool isFull() const {
+		return m_isFull;
+	}
 
 // 对话框数据
 #ifdef AFX_DESIGN_TIME

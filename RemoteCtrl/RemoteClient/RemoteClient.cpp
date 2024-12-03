@@ -97,6 +97,7 @@ BOOL CRemoteClientApp::InitInstance()
 	// 删除上面创建的 shell 管理器。
 	if (pShellManager != nullptr)
 	{
+		TRACE("Release shell manager\r\n");
 		delete pShellManager;
 	}
 

@@ -211,14 +211,14 @@ public:
 	int DealCommand() {
 		if (m_sock == -1) return -1;
 
-		char* buffer = m_buffer.data(); // 4k的
+		char* buffer = m_buffer.data(); // TODO: 多线程发送命令时可能会出现冲突
 
 		static size_t index = 0; // buffer缓存的索引
 
 		while (true)
 		{
 			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);
-			if ((len <= 0) && (index == 0)) {
+			if (((int)len <= 0) && ((int)index == 0)) {
 				return -1;
 			}
 
@@ -324,10 +324,12 @@ private:
 
 	static void releaseInstance()
 	{
+		TRACE("Socket release has been call!\r\n");
 		if (m_instance != NULL) {
 			CClientSocket* tmp = m_instance;
 			m_instance = NULL;
 			delete tmp;
+			TRACE("Release socket instance\r\n");
 		}
 	}
 
