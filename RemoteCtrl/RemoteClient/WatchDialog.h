@@ -52,6 +52,11 @@ public:
 
 	afx_msg void OnStnClickedWatch();
 
+	CImage& getImage()
+	{
+		return m_image;
+	}
+
 public:
 	CStatic m_picture;
 	int m_nObjWidth;
@@ -59,4 +64,5 @@ public:
 	virtual void OnOK();
 	afx_msg void OnBnClickedBtnLock();
 	afx_msg void OnBnClickedBtnUnlock();
+	CImage m_image;
 };

@@ -55,12 +55,15 @@ LRESULT CClientController::SendMessage(MSG msg)
 
 	WaitForSingleObject(hEvent, INFINITE);
 
+	CloseHandle(hEvent);
+
 	return info.result;
 }
 
 int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plsPacks)
 
 {
+	TRACE("cmd %d %s start %lld \r\n", nCmd, __FUNCTION__, GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
 
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -72,10 +75,12 @@ int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
 	
 	pClient->SendPacket(CPacket(nCmd, pData, nLength,hEvent), *plsPacks);
 
+	CloseHandle(hEvent); // 回收事件句柄，防止资源耗尽
+
 	if (plsPacks->size() > 0) {
 		return plsPacks->front().sCmd;
 	}
-
+	TRACE("%s end %lld \r\n", __FUNCTION__, GetTickCount64());
 	return -1;
 }
 int CClientController::DownFile(CString strPath)
@@ -246,16 +251,17 @@ void CClientController::threadWatchScreen()
 			std::list<CPacket> lstPacks;
 			int ret = SendCommandPacket(6, true, NULL, 0, &lstPacks);
 			if (ret == 6) {
-				
-				if (CCommonTool::Bytes2Image(m_remoteDlg.getImage(), lstPacks.front().strData) == 0) {
+				if (CCommonTool::Bytes2Image(m_watchDlg.getImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
+					TRACE("成功设置图片 %08X\r\n", (HBITMAP)m_watchDlg.getImage());
+					TRACE("和校验：%04X\r\n", lstPacks.front().sSum);
 				}
 				else {
 					TRACE("获取图片失败! ret = %d\r\n", ret);
 				}
 			}
 		}
-		Sleep(1);	
+		Sleep(1);
 	}
 }
 

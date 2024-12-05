@@ -303,7 +303,7 @@ void CRemoteClientDlg::LoadFileInfo()
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
 
-	CClientController::getInstance()->CloseSocket();
+	// CClientController::getInstance()->CloseSocket();
 }
 
 void CRemoteClientDlg::LoadFileCurrent()
@@ -336,7 +336,7 @@ void CRemoteClientDlg::LoadFileCurrent()
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
 
-	CClientController::getInstance()->CloseSocket();
+	// CClientController::getInstance()->CloseSocket();
 }
 
 // 双击
