@@ -282,7 +282,7 @@ private:
 	int m_nPort; // 端口
 
 	std::list<CPacket> m_lstSend;
-	std::map<HANDLE, std::list<CPacket>> m_mapAck; // list适合频繁的插入和删除操作
+	std::map<HANDLE, std::list<CPacket>&> m_mapAck; // list适合频繁的插入和删除操作
 
 	bool m_bAutoClose;
 
