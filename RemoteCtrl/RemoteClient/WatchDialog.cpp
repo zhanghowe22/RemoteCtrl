@@ -54,10 +54,11 @@ CPoint CWatchDialog::UserPoint2RemoteScreenPoint(CPoint& point, bool isScreen)
 {
 	// 800 * 450
 	CRect clientRect;
-	if (isScreen)
+	if (!isScreen)
 	{
-		ScreenToClient(&point); // 全局坐标到客户区域坐标
+		ClientToScreen(&point); // 转换为相对屏幕左上角的坐标（屏幕内的绝对坐标）
 	}
+	m_picture.ScreenToClient(&point);
 	
 	TRACE("x= %d, y= %d\r\n", point.x, point.y);
 
