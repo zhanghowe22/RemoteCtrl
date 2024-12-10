@@ -51,13 +51,16 @@ public:
 		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t nLength = 0);
+		size_t nLength = 0,
+		WPARAM wParam = 0);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
 
 		return CCommonTool::Bytes2Image(image, pClient->GetPacket().strData);	
 	}
+
+	void DownloadEnd();
 
 	int DownFile(CString strPath);
 

@@ -1,5 +1,7 @@
 ﻿#pragma once
-
+#ifndef WM_SEND_PACK_ACK
+#define WM_SEND_PACK_ACK (WM_USER + 2)
+#endif
 
 // CWatchDialog 对话框
 
@@ -51,6 +53,8 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 
 	afx_msg void OnStnClickedWatch();
+
+	afx_msg LRESULT OnSendPackAck(WPARAM wParam, LPARAM lParam);
 
 	CImage& getImage()
 	{

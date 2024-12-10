@@ -88,6 +88,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_THEMECHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnNMThemeChangedIpaddressServ)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
+	ON_MESSAGE(WM_SEND_PACK_ACK, &CRemoteClientDlg::OnSendPackAck)
 END_MESSAGE_MAP()
 
 
@@ -196,28 +197,9 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	std::list<CPacket> lstPackets;
 	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 1, true, NULL, 0); // 查看磁盘分区
 
-	if (ret == -1 || lstPackets.size() <= 0) {
+	if (ret == 0) {
 		AfxMessageBox(_T("命令处理失败！！！"));
 		return;
-	}
-
-	CPacket& head = lstPackets.front();
-
-	std::string drivers = head.strData;
-	std::string dr; // 临时变量
-	m_Tree.DeleteAllItems();
-	HTREEITEM hTemp;
-
-	for (size_t i = 0; i <= drivers.size(); i++) {
-		if (i == drivers.size() || drivers[i] == ',') {
-			dr += ":";
-			hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
-			m_Tree.InsertItem("", hTemp, TVI_LAST);
-			dr.clear();
-		}
-		else {
-			dr += drivers[i];
-		}
 	}
 }
 
@@ -270,23 +252,13 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	// 将路径发送到受控端
 	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, 
+		(BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)HTreeSelected);
 
 	if (lstPackets.size() > 0) {
 		std::list<CPacket>::iterator it = lstPackets.begin();
 		for (; it != lstPackets.end(); it++) {
-			PFILEINFO pInfo = (PFILEINFO)(*it).strData.c_str();
-			if(pInfo->hasNext == false) continue;
-			if (pInfo->isDirectory) {
-				if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
-					continue;
-				}
-				HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, HTreeSelected, TVI_LAST);
-				m_Tree.InsertItem("", hTemp, TVI_LAST);
-			}
-			else {
-				m_List.InsertItem(0, pInfo->szFileName);
-			}
+
 		}
 	}
 }
@@ -452,4 +424,103 @@ void CRemoteClientDlg::OnEnChangeEditPort()
 	CClientController* pController = CClientController::getInstance();
 
 	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
+}
+
+LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam)
+{
+	if ((lParam == -1) || (lParam == -2)) {
+		// TODO: 错误处理
+	}
+
+	else if (lParam == 1) {
+		// 对方关闭了套接字
+	}
+
+	else {
+		CPacket* pPacket = (CPacket*)wParam;
+		
+		if (pPacket != NULL) {
+
+			CPacket& head = *pPacket;
+
+			switch (pPacket->sCmd) {
+			case 1: // 获取驱动信息
+			{
+				std::string drivers = head.strData;
+				std::string dr; // 临时变量
+				m_Tree.DeleteAllItems();
+				HTREEITEM hTemp;
+
+				for (size_t i = 0; i <= drivers.size(); i++) {
+					if (i == drivers.size() || drivers[i] == ',') {
+						dr += ":";
+						hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+						m_Tree.InsertItem("", hTemp, TVI_LAST);
+						dr.clear();
+					}
+					else {
+						dr += drivers[i];
+					}
+				}
+				break;
+			}
+
+			case 2: // 获取文件信息
+			{
+				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
+				if (pInfo->hasNext == false) break;
+				if (pInfo->isDirectory) {
+					if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
+						break;
+					}
+					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
+					m_Tree.InsertItem("", hTemp, TVI_LAST);
+				}
+				else {
+					m_List.InsertItem(0, pInfo->szFileName);
+				}
+				break;
+			}
+
+			case 3:
+				TRACE("Run file done!\r\n");
+				break;
+			case 4: { // 下载文件
+				static LONGLONG length = 0, index = 0;
+				if (length == 0) {
+					length = *(long long*)head.strData.c_str();
+					if (length == 0) {
+						AfxMessageBox("文件长度为0或者无法读取文件!!!");
+						CClientController::getInstance()->DownloadEnd();
+						break;
+					}
+				}
+				else if (length > 0 && index >= length) {
+					fclose((FILE*)lParam);
+					length = 0;
+					index = 0;
+					CClientController::getInstance()->DownloadEnd();
+				}
+				else {
+					FILE* pFile = (FILE*)lParam;
+					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);
+					index += head.strData.size();
+				}
+
+				break;
+			}
+			case 9:
+				TRACE("Delete file done!\r\n");
+				break;
+			case 1981:
+				TRACE("Test connection success!\r\n");
+				break;
+			default:
+				TRACE("Unknow data received! %d \r\n", head.sCmd);
+				break;
+			}
+		}
+	}
+	 
+	return 0;
 }
