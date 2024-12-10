@@ -43,15 +43,15 @@ public:
 	3:打开文件 4:下载文件 5:鼠标操作 6:发送屏幕内容 7:锁机 8:解锁 9:删除文件 1981:测试连接
 	* @param pData 包数据
 	* @param nLength 数据长度
-	* @return 命令号，如果小于0，则是错误
+	* @return状态 true是成功 false是失败
 	*/
 
-	int SendCommandPacket(
+	bool SendCommandPacket(
+		HWND hWnd, // 数据包收到后，需要应答的窗口
 		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t nLength = 0,
-		std::list<CPacket>* plsPacks = NULL);
+		size_t nLength = 0);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();

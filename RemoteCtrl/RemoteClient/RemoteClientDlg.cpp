@@ -187,14 +187,14 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
-	CClientController::getInstance()->SendCommandPacket(1981);
+	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 1981);
 }
 
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
 	std::list<CPacket> lstPackets;
-	int ret = CClientController::getInstance()->SendCommandPacket(1, true, NULL, 0, &lstPackets); // 查看磁盘分区
+	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 1, true, NULL, 0); // 查看磁盘分区
 
 	if (ret == -1 || lstPackets.size() <= 0) {
 		AfxMessageBox(_T("命令处理失败！！！"));
@@ -270,7 +270,7 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	// 将路径发送到受控端
 	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(), &lstPackets);
+	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 
 	if (lstPackets.size() > 0) {
 		std::list<CPacket>::iterator it = lstPackets.begin();
@@ -299,7 +299,7 @@ void CRemoteClientDlg::LoadFileCurrent()
 	m_List.DeleteAllItems();
 
 	// 将路径发送到受控端
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath);
 
 	// 接收受控端返回的信息
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
@@ -389,7 +389,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	CString strFile = m_List.GetItemText(nSelected, 0);
 
 	strFile = strPath + strFile;
-	int ret = CClientController::getInstance()->SendCommandPacket(9, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 9, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 
 	if (ret < 0) {
 		AfxMessageBox("删除文件执行命令失败！！！");
@@ -412,7 +412,7 @@ void CRemoteClientDlg::OnRunFile()
 	strFile = strPath + + "\\" +strFile;
 
 	TRACE("Run file name is:%s\r\n", strFile);
-	int ret = CClientController::getInstance()->SendCommandPacket(3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 
 	if (ret < 0) {
 		AfxMessageBox("打开文件执行命令失败！！！");
