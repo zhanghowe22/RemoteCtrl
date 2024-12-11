@@ -35,8 +35,6 @@ private:
 
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 
-	void LoadFileInfo();
-
 	void LoadFileCurrent();
 
 // 实现
@@ -51,7 +49,9 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+
 public:
+	void LoadFileInfo();
 	afx_msg void OnBnClickedBtnTest();
 	DWORD m_server_address;
 	CString m_nPort;

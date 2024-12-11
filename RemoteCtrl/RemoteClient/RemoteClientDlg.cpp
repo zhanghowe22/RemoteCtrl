@@ -466,13 +466,16 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 			case 2: // 获取文件信息
 			{
 				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
+				TRACE("HasNext %d isdirectory %d %s\r\n", pInfo->hasNext, pInfo->isDirectory, pInfo->szFileName);
 				if (pInfo->hasNext == false) break;
 				if (pInfo->isDirectory) {
 					if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
 						break;
 					}
+					TRACE("hselected %08X\r\n", lParam);
 					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
 					m_Tree.InsertItem("", hTemp, TVI_LAST);
+					m_Tree.Expand((HTREEITEM)lParam, TVE_EXPAND);
 				}
 				else {
 					m_List.InsertItem(0, pInfo->szFileName);
@@ -503,6 +506,12 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 					FILE* pFile = (FILE*)lParam;
 					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);
 					index += head.strData.size();
+					if (index >= length) {
+						fclose((FILE*)lParam);
+						length = 0;
+						index = 0;
+						CClientController::getInstance()->DownloadEnd();
+					}
 				}
 
 				break;
