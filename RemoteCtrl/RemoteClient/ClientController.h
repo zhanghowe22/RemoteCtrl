@@ -113,7 +113,7 @@ protected:
 private:
 	static CClientController* m_instance;
 
-	CWatchDialog m_watchDlg;
+	CWatchDialog m_watchDlg; // 消息包，在对话框关闭之后，可能导致内存泄漏
 	CRemoteClientDlg m_remoteDlg;
 	CStatusDlg m_statusDlg;
 
