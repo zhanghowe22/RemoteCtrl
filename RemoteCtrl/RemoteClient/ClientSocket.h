@@ -277,6 +277,8 @@ public:
 	}
 
 private:
+	HANDLE m_eventInvoke; // Æô¶¯ÊÂ¼þ
+
 	typedef void(CClientSocket::*MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	std::map<UINT, MSGFUNC> m_mapFunc;
 

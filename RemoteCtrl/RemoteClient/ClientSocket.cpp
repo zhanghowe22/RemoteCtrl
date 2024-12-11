@@ -44,6 +44,13 @@ m_hThread(INVALID_HANDLE_VALUE) {
 		exit(0);
 	}
 
+	m_eventInvoke = CreateEvent(NULL, TRUE, FALSE, NULL);
+	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientSocket::threadEntry, this, 0, &m_nThreadID);
+	if (WaitForSingleObject(m_eventInvoke, 100) == WAIT_TIMEOUT) {
+		TRACE("网络消息处理线程启动失败!\r\n");
+	}
+	CloseHandle(m_eventInvoke);
+
 	m_buffer.resize(BUFFER_SIZE);
 	memset(m_buffer.data(), 0, BUFFER_SIZE);
 	struct {
@@ -98,9 +105,7 @@ bool CClientSocket::InitSocket()
 }
 
 bool CClientSocket::SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed, WPARAM wParam) {
-	if (m_hThread == INVALID_HANDLE_VALUE) {
-		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientSocket::threadEntry, this, 0, &m_nThreadID);
-	}
+
 	UINT nMode = isAutoClosed ? CSM_AUTOCLOSE : 0;
 	std::string strOut;
 	pack.Data(strOut);
@@ -245,6 +250,7 @@ void CClientSocket::threadFunc()
 
 void CClientSocket::threadFunc2()
 {
+	SetEvent(m_eventInvoke);
 	MSG msg;
 	while (::GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
