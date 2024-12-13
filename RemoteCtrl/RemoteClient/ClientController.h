@@ -18,12 +18,13 @@ class CClientController
 public:
 	// 获取全局唯一对象
 	static CClientController* getInstance();
+
 	// 初始化
 	int InitController();
+
 	// 启动
 	int Invoke(CWnd*& pMainWnd);
-	// 发送消息
-	LRESULT SendMessage(MSG msg);
+
 	// 更新网络服务器的地址
 	void UpdateAddress(int nIP, int nPort) {
 		CClientSocket::getInstance()->UpdateAddress(nIP, nPort);
@@ -71,7 +72,6 @@ protected:
 		m_statusDlg(&m_remoteDlg), 
 		m_watchDlg(&m_remoteDlg)
 	{
-		m_hThreadDownload = INVALID_HANDLE_VALUE;
 		m_hThread = INVALID_HANDLE_VALUE;
 		m_hThreadWatch = INVALID_HANDLE_VALUE;
 		m_nThreadID = -1;
@@ -102,10 +102,6 @@ protected:
 
 	LRESULT OnShowWatcher(UINT nMsg, WPARAM wParam, LPARAM lParam);
 
-	void threadDownloadFile();
-
-	static void threadDownloadEntry(void* arg);
-
 	void threadWatchScreen();
 
 	static void threadWatchEntry(void* arg);
@@ -118,7 +114,6 @@ private:
 	CStatusDlg m_statusDlg;
 
 	HANDLE m_hThread;
-	HANDLE m_hThreadDownload;
 	HANDLE m_hThreadWatch;
 
 	bool m_isClosed; // 监视串口是否关闭

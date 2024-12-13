@@ -7,7 +7,6 @@
 #include "RemoteClient.h"
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
-#include "ClientSocket.h"
 #include "WatchDialog.h"
 #include "ClientController.h"
 
@@ -23,19 +22,19 @@ class CAboutDlg : public CDialogEx
 public:
 	CAboutDlg();
 
-// 对话框数据
-#ifdef AFX_DESIGN_TIME
+	// 对话框数据
+	#ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_ABOUTBOX };
-#endif
+	#endif
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 // 实现
 protected:
 	DECLARE_MESSAGE_MAP()
 public:
-	
+
 };
 
 CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
@@ -120,18 +119,9 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	// 设置此对话框的图标。  当应用程序主窗口不是对话框时，框架将自动
 	//  执行此操作
-	SetIcon(m_hIcon, TRUE);			// 设置大图标
-	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
-	// TODO: 在此添加额外的初始化代码
-	UpdateData();
-	m_server_address = 0x7F000001; // 0x7F000001对应127.0.0.1
-	m_nPort = _T("9527");
-	CClientController* pController = CClientController::getInstance();
-	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
-	UpdateData(FALSE);
-	m_dlgStatus.Create(IDD_DLG_STATUS, this);
-	m_dlgStatus.ShowWindow(SW_HIDE);
+	InitUIData();
+
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -241,9 +231,6 @@ void CRemoteClientDlg::LoadFileInfo()
 		return;
 	}
 
-	if (m_Tree.GetChildItem(HTreeSelected) == NULL)
-		return;
-
 	DeleteTreeChildrenItem(HTreeSelected);
 	m_List.DeleteAllItems();
 
@@ -252,15 +239,8 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	// 将路径发送到受控端
 	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, 
+	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false,
 		(BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)HTreeSelected);
-
-	if (lstPackets.size() > 0) {
-		std::list<CPacket>::iterator it = lstPackets.begin();
-		for (; it != lstPackets.end(); it++) {
-
-		}
-	}
 }
 
 void CRemoteClientDlg::LoadFileCurrent()
@@ -294,6 +274,120 @@ void CRemoteClientDlg::LoadFileCurrent()
 	}
 
 	// CClientController::getInstance()->CloseSocket();
+}
+
+void CRemoteClientDlg::Str2Tree(const std::string& drivers, CTreeCtrl& tree)
+{
+	std::string dr; // 临时变量
+	tree.DeleteAllItems();
+
+	for (size_t i = 0; i < drivers.size(); i++) {
+		if (drivers[i] == ',') {
+			if (!dr.empty()) {
+				dr += ":";
+				HTREEITEM hTemp = tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+				tree.InsertItem("", hTemp, TVI_LAST);
+				dr.clear();
+			}
+		}
+		else {
+			dr += drivers[i];
+		}
+	}
+
+	// 处理最后一个驱动
+	if (!dr.empty()) {
+		dr += ":";
+		HTREEITEM hTemp = tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+		tree.InsertItem("", hTemp, TVI_LAST);
+	}
+}
+
+void CRemoteClientDlg::UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent)
+{
+	TRACE("HasNext %d isdirectory %d %s\r\n", finfo.hasNext, finfo.isDirectory, finfo.szFileName);
+	if (!finfo.hasNext) return;
+	if (finfo.isDirectory) {
+		CString fileName(finfo.szFileName);
+		if (fileName == "." || fileName == "..") return;
+		TRACE("hselected %08X\r\n", hParent);
+		HTREEITEM hTemp = m_Tree.InsertItem(finfo.szFileName, static_cast<HTREEITEM>(hParent), TVI_LAST);
+		m_Tree.InsertItem("", hTemp, TVI_LAST);
+		m_Tree.Expand(hParent, TVE_EXPAND);
+	}
+	else {
+		m_List.InsertItem(0, finfo.szFileName);
+	}
+}
+
+void CRemoteClientDlg::UpdateDownloadFile(const std::string& strData, FILE* pFile)
+{
+	static LONGLONG length = 0, index = 0;
+	if (length == 0) {
+		length = *(long long*)strData.c_str();
+		if (length == 0) {
+			AfxMessageBox("文件长度为0或者无法读取文件!!!");
+			CClientController::getInstance()->DownloadEnd();
+		}
+	}
+	else if (length > 0 && index >= length) {
+		fclose(pFile);
+		length = 0;
+		index = 0;
+		CClientController::getInstance()->DownloadEnd();
+	}
+	else {
+		fwrite(strData.c_str(), 1, strData.size(), pFile);
+		index += strData.size();
+		if (index >= length) {
+			fclose(pFile);
+			length = 0;
+			index = 0;
+			CClientController::getInstance()->DownloadEnd();
+		}
+	}
+}
+
+void CRemoteClientDlg::InitUIData()
+{
+	SetIcon(m_hIcon, TRUE);			// 设置大图标
+	SetIcon(m_hIcon, FALSE);		// 设置小图标
+	UpdateData();
+	m_server_address = 0x7F000001; // 0x7F000001对应127.0.0.1
+	m_nPort = _T("9527");
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
+	UpdateData(FALSE);
+	m_dlgStatus.Create(IDD_DLG_STATUS, this);
+	m_dlgStatus.ShowWindow(SW_HIDE);
+}
+
+void CRemoteClientDlg::DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam)
+{
+	switch (nCmd) {
+
+	case 1: // 获取驱动信息
+		Str2Tree(strData, m_Tree);
+		break;
+	case 2: // 获取文件信息
+		UpdateFileInfo(*(PFILEINFO)strData.c_str(), (HTREEITEM)lParam);
+		break;
+	case 3:
+		MessageBox("打开文件完成!", "操作完成", MB_ICONINFORMATION);
+		break;
+	case 4: // 下载文件
+		UpdateDownloadFile(strData, (FILE*)lParam);
+		break;
+	case 9:
+		MessageBox("删除文件完成!", "操作完成", MB_ICONINFORMATION);
+		break;
+	case 1981:
+		MessageBox("连接测试成功!", "连接成功", MB_ICONINFORMATION);
+		break;
+	default:
+		TRACE("Unknow data received! %d \r\n", nCmd);
+		break;
+	}
 }
 
 // 双击
@@ -381,7 +475,7 @@ void CRemoteClientDlg::OnRunFile()
 	int nSelected = m_List.GetSelectionMark();
 	CString strFile = m_List.GetItemText(nSelected, 0);
 
-	strFile = strPath + + "\\" +strFile;
+	strFile = strPath + +"\\" + strFile;
 
 	TRACE("Run file name is:%s\r\n", strFile);
 	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
@@ -430,104 +524,18 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 {
 	if ((lParam == -1) || (lParam == -2)) {
 		// TODO: 错误处理
+		TRACE("Socket is error! %d\r\n", lParam);
 	}
-
 	else if (lParam == 1) {
 		// 对方关闭了套接字
+		TRACE("Socket is closed!\r\n");
 	}
-
 	else {
 		if (wParam != NULL) {
 			CPacket head = *(CPacket*)wParam;
 			delete (CPacket*)wParam;
-
-			switch (head.sCmd) {
-			case 1: // 获取驱动信息
-			{
-				std::string drivers = head.strData;
-				std::string dr; // 临时变量
-				m_Tree.DeleteAllItems();
-				HTREEITEM hTemp;
-
-				for (size_t i = 0; i <= drivers.size(); i++) {
-					if (i == drivers.size() || drivers[i] == ',') {
-						dr += ":";
-						hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
-						m_Tree.InsertItem("", hTemp, TVI_LAST);
-						dr.clear();
-					}
-					else {
-						dr += drivers[i];
-					}
-				}
-				break;
-			}
-
-			case 2: // 获取文件信息
-			{
-				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
-				TRACE("HasNext %d isdirectory %d %s\r\n", pInfo->hasNext, pInfo->isDirectory, pInfo->szFileName);
-				if (pInfo->hasNext == false) break;
-				if (pInfo->isDirectory) {
-					if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
-						break;
-					}
-					TRACE("hselected %08X\r\n", lParam);
-					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
-					m_Tree.InsertItem("", hTemp, TVI_LAST);
-					m_Tree.Expand((HTREEITEM)lParam, TVE_EXPAND);
-				}
-				else {
-					m_List.InsertItem(0, pInfo->szFileName);
-				}
-				break;
-			}
-
-			case 3:
-				TRACE("Run file done!\r\n");
-				break;
-			case 4: { // 下载文件
-				static LONGLONG length = 0, index = 0;
-				if (length == 0) {
-					length = *(long long*)head.strData.c_str();
-					if (length == 0) {
-						AfxMessageBox("文件长度为0或者无法读取文件!!!");
-						CClientController::getInstance()->DownloadEnd();
-						break;
-					}
-				}
-				else if (length > 0 && index >= length) {
-					fclose((FILE*)lParam);
-					length = 0;
-					index = 0;
-					CClientController::getInstance()->DownloadEnd();
-				}
-				else {
-					FILE* pFile = (FILE*)lParam;
-					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);
-					index += head.strData.size();
-					if (index >= length) {
-						fclose((FILE*)lParam);
-						length = 0;
-						index = 0;
-						CClientController::getInstance()->DownloadEnd();
-					}
-				}
-
-				break;
-			}
-			case 9:
-				TRACE("Delete file done!\r\n");
-				break;
-			case 1981:
-				TRACE("Test connection success!\r\n");
-				break;
-			default:
-				TRACE("Unknow data received! %d \r\n", head.sCmd);
-				break;
-			}
+			DealCommand(head.sCmd, head.strData, lParam);
 		}
 	}
-
 	return 0;
 }

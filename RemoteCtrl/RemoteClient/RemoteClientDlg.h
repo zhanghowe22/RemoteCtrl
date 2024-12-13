@@ -4,6 +4,8 @@
 
 #pragma once
 #include "StatusDlg.h"
+#include <iostream>
+#include "ClientSocket.h"
 
 #ifndef WM_SEND_PACK_ACK
 #define WM_SEND_PACK_ACK (WM_USER + 2)
@@ -36,6 +38,16 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 
 	void LoadFileCurrent();
+
+	void Str2Tree(const std::string& driver, CTreeCtrl& tree);
+
+	void UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent);
+
+	void UpdateDownloadFile(const std::string& strData, FILE* pFile);
+
+	void InitUIData();
+
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
 
 // 实现
 protected:
