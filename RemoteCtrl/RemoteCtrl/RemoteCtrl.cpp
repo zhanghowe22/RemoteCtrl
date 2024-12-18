@@ -6,6 +6,7 @@
 #include "ServerSocket.h"
 #include "Command.h"
 #include "CommonTool.h"
+#include <conio.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -21,7 +22,7 @@ using namespace std;
 bool ChooseAutoInvoke(const CString& strPath) {
 	TCHAR wcsSystem[MAX_PATH] = _T("");
 	if (PathFileExists(strPath)) {
-		return;
+		return true;
 	}
 
 	CString strInfo = _T("该程序只允许用于合法的用途！\n");
@@ -43,8 +44,121 @@ bool ChooseAutoInvoke(const CString& strPath) {
 	return true;
 }
 
+#define IOCP_LIST_EMPTY 0
+#define IOCP_LIST_PUSH 1
+#define IOCP_LIST_POP 2
+
+enum {
+	IocpListEmpty,
+	IocpListPush,
+	IocpListPop
+};
+
+
+typedef struct IocpParam {
+	int nOperator; // 操作
+	std::string strData; // 数据
+	_beginthread_proc_type cbFunc; // 回调
+
+	IocpParam(int op, const char* sData, _beginthread_proc_type cb = NULL) {
+		nOperator = op;
+		strData = sData;
+		cbFunc = cb;
+	}
+
+	IocpParam() {
+		nOperator = -1;
+	}
+
+}IOCP_PARAM;
+
+void threadQueueEntry(HANDLE hIOCP)
+{
+	std::list<std::string> lsString;
+	DWORD dwTransferred = 0;
+	ULONG_PTR completionKey = 0;
+	OVERLAPPED* pOverlAppend = NULL;
+
+	while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &completionKey, &pOverlAppend, INFINITE)) {
+		if ((dwTransferred == 0) || (completionKey == NULL)) {
+			printf("Thread is prepare to exit!\r\n");
+			break;
+		}
+		IOCP_PARAM* pParam = (IOCP_PARAM*)completionKey;
+		if (pParam->nOperator == IocpListPush) {
+			lsString.push_back(pParam->strData);
+		}
+		else if (pParam->nOperator == IocpListPop) {
+			std::string* pStr = NULL;
+			if (lsString.size() > 0) {
+				pStr = new std::string(lsString.front());
+				lsString.pop_front();
+			}
+			if (pParam->cbFunc) {
+				pParam->cbFunc(pStr);
+			}
+		}
+		else if (pParam->nOperator == IocpListEmpty) {
+			lsString.clear();
+		}
+
+		delete pParam;
+	}
+
+	_endthread();
+}
+
+void func(void* arg)
+{
+	std::string* pstr = (std::string*)arg;
+	if (pstr != NULL) {
+		printf("Pop from list: %s \r\n", pstr->c_str());
+		delete pstr;
+	}
+	else {
+		printf("List is empty, no data!\r\n");
+	}
+}
+
 int main()
 {
+	if (!CCommonTool::Init()) return 1;
+
+	printf("press any key to exit ...\r\n");
+
+	HANDLE hIOCP = INVALID_HANDLE_VALUE; // IO Completion Port
+
+	hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1); // epoll的区别点1
+
+	HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry, 0, hIOCP);
+
+	ULONGLONG tick = GetTickCount64();
+
+	while (_kbhit() != 0) { // 完成端口 把请求与实现分离开了
+		if (GetTickCount64() - tick > 1300) {
+			PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world"), NULL);
+			tick = GetTickCount64();
+		}
+
+		if (GetTickCount64() - tick > 2000) {
+			PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello world"), NULL);
+			tick = GetTickCount64();
+		}
+
+		Sleep(1);
+	}
+
+	if (hIOCP != NULL) {
+		PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);
+		WaitForSingleObject(hThread, INFINITE);
+	}
+
+	CloseHandle(hIOCP);
+
+	printf("exit done!\r\n");
+	::exit(0);
+
+	/*
 	if (CCommonTool::IsAdmin()) {
 		if (!CCommonTool::Init()) return 1;
 		if (ChooseAutoInvoke(INVOKE_PATH)) {
@@ -71,5 +185,6 @@ int main()
 			return 1;
 		}
 	}
+	*/
 	return 0;
 }
