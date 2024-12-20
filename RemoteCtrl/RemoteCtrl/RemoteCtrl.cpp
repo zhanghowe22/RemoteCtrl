@@ -72,12 +72,12 @@ typedef struct IocpParam {
 
 }IOCP_PARAM;
 
-void threadQueueEntry(HANDLE hIOCP)
-{
+void threadMain(HANDLE hIOCP) {
 	std::list<std::string> lsString;
 	DWORD dwTransferred = 0;
 	ULONG_PTR completionKey = 0;
 	OVERLAPPED* pOverlAppend = NULL;
+	int count = 0, count0 = 0;
 
 	while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &completionKey, &pOverlAppend, INFINITE)) {
 		if ((dwTransferred == 0) || (completionKey == NULL)) {
@@ -87,6 +87,7 @@ void threadQueueEntry(HANDLE hIOCP)
 		IOCP_PARAM* pParam = (IOCP_PARAM*)completionKey;
 		if (pParam->nOperator == IocpListPush) {
 			lsString.push_back(pParam->strData);
+			count0++;
 		}
 		else if (pParam->nOperator == IocpListPop) {
 			std::string* pStr = NULL;
@@ -97,15 +98,21 @@ void threadQueueEntry(HANDLE hIOCP)
 			if (pParam->cbFunc) {
 				pParam->cbFunc(pStr);
 			}
+			count++;
 		}
 		else if (pParam->nOperator == IocpListEmpty) {
 			lsString.clear();
 		}
-
 		delete pParam;
 	}
+	// lsString.clear();
+	printf("thread exit! count = %d count0 = %d\r\n", count, count0);
+}
 
-	_endthread();
+void threadQueueEntry(HANDLE hIOCP)
+{
+	threadMain(hIOCP);
+	_endthread(); // 代码到此为止，会导致本地对象无法调用析构，从而使得内存发生泄漏
 }
 
 void func(void* arg)
@@ -130,19 +137,28 @@ int main()
 
 	hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1); // epoll的区别点1
 
+	if (hIOCP == INVALID_HANDLE_VALUE || hIOCP == NULL) {
+		printf("Create iocp failed!%d\r\n", GetLastError());
+		return 1;
+	}
+
 	HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry, 0, hIOCP);
 
 	ULONGLONG tick = GetTickCount64();
+	ULONGLONG tick0 = GetTickCount64();
+	int count = 0, count0 = 0;
 
-	while (_kbhit() != 0) { // 完成端口 把请求与实现分离开了
+	while (_kbhit() == 0) { // 完成端口 把请求与实现分离开了
 		if (GetTickCount64() - tick > 1300) {
-			PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world"), NULL);
+			PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world", func), NULL);
 			tick = GetTickCount64();
+			count++;
 		}
 
-		if (GetTickCount64() - tick > 2000) {
+		if (GetTickCount64() - tick0 > 2000) {
 			PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello world"), NULL);
-			tick = GetTickCount64();
+			tick0 = GetTickCount64();
+			count0++;
 		}
 
 		Sleep(1);
@@ -154,6 +170,8 @@ int main()
 	}
 
 	CloseHandle(hIOCP);
+
+	printf("exit done! count = %d count0 = %d\r\n", count, count0);
 
 	printf("exit done!\r\n");
 	::exit(0);
