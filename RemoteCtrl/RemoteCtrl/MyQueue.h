@@ -40,18 +40,20 @@ public:
 		if (m_hCompeletionPort != NULL) {
 			m_hThread = (HANDLE)_beginthread(
 				&CMyQueue<T>::threadEntry,
-				0, m_hCompeletionPort);
+				0, this);
 		}
 	}
 
 	~CMyQueue() {
 		if (m_lock) return;
 		m_lock = true;
-		HANDLE hTemp = m_hCompeletionPort;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
 		WaitForSingleObject(m_hThread, INFINITE);
-		m_hCompeletionPort = NULL;
-		CloseHandle(hTemp);
+		if (m_hCompeletionPort != NULL) {
+			HANDLE hTemp = m_hCompeletionPort;
+			m_hCompeletionPort = NULL;
+			CloseHandle(hTemp);
+		}
 	}
 
 	bool PushBack(const T& data) {
@@ -187,7 +189,9 @@ private:
 			DealParam(pParam);
 		}
 
-		CloseHandle(m_hCompeletionPort);
+		HANDLE hTemp = m_hCompeletionPort;
+		m_hCompeletionPort = NULL;
+		CloseHandle(hTemp);
 	}
 
 private:
