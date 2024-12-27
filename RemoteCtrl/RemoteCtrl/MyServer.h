@@ -1,10 +1,8 @@
 #pragma once
+#include <MSWSock.h>
 #include "MyThread.h"
+#include "MyQueue.h"
 #include <map>
-
-class MyClient {
-
-};
 
 enum MyOperator {
 	ENone,
@@ -14,58 +12,124 @@ enum MyOperator {
 	EError
 };
 
+class CMyServer;
+class MyClient;
+
+typedef std::shared_ptr<MyClient> PCLIENT;
+
 class MyOverlapped {
 public:
 	OVERLAPPED m_overlapped;
 	DWORD m_operator; // 操作 参见MyOperator
 	std::vector<char> m_buffer; // 缓冲区
 	ThreadWorker m_worker; // 处理函数
+	CMyServer* m_server; // 服务器对象
+	PCLIENT m_client; // 对应的客户端
+	WSABUF m_wsabuffer;
+};
+
+template<MyOperator>class AccpetOverlapped;
+typedef AccpetOverlapped<EAccept> ACCEPTOVERLAPPED;
+template<MyOperator>class RecvOverlapped;
+typedef RecvOverlapped<ERecv> RECVOVERLAPPED;
+template<MyOperator>class SendOverlapped;
+typedef SendOverlapped<ESend> SENDOVERLAPPED;
+
+class MyClient {
+public:
+	MyClient();
+
+	~MyClient() {
+		closesocket(m_sock);
+	}
+
+	void SetOverlapped(PCLIENT& ptr);
+
+	operator SOCKET() {
+		return m_sock;
+	}
+
+	operator PVOID() {
+		return &m_buffer[0];
+	}
+
+	operator LPOVERLAPPED();
+
+	operator LPDWORD() {
+		return &m_received;
+	}
+
+	LPWSABUF RecvWSABuffer();
+
+	LPWSABUF SendWSABuffer();
+
+	DWORD& flags() { return m_flags; }
+
+	sockaddr_in* GetLocalAddr() { return &m_laddr; }
+	sockaddr_in* GetRemoteAddr() { return &m_raddr; }
+
+	size_t GetBuffferSize() const {
+		return m_buffer.size();
+	}
+
+	int Recv() {
+		int ret = recv(m_sock, m_buffer.data() + m_used, m_buffer.size() - m_used, 0);
+		if (ret <= 0) return -1;
+		m_used += (size_t)ret;
+		// TODO: 解析数据
+		return 0;
+	}
+
+private:
+	SOCKET m_sock;
+	DWORD m_received;
+	DWORD m_flags;
+	std::shared_ptr<ACCEPTOVERLAPPED> m_overlapped;
+	std::shared_ptr<RECVOVERLAPPED> m_recv;
+	std::shared_ptr<SENDOVERLAPPED> m_send;
+	std::vector<char> m_buffer;
+	size_t m_used; // 已经使用的缓冲区大小
+	sockaddr_in m_raddr;
+	sockaddr_in m_laddr;
+	bool m_isbusy;
 };
 
 template<MyOperator>
 class AccpetOverlapped : public MyOverlapped, ThreadFuncBase
 {
 public:
-	AccpetOverlapped() :m_operator(EAccept), m_worker(this, &AccpetOverlapped::AcceptWorker) {
-		memset(&m_overlapped, 0, sizeof(m_overlapped));
-		m_buffer.resize(1024);
-	}
+	AccpetOverlapped();
 
-	int AcceptWorker() {
-		// TODO
-	}
+	int AcceptWorker();
+
+	PCLIENT m_client;
 };
-typedef AccpetOverlapped<EAccept> ACCEPTOVERLAPPED;
+
 
 template<MyOperator>
 class RecvOverlapped : public MyOverlapped, ThreadFuncBase
 {
 public:
-	RecvOverlapped() :m_operator(ERecv), m_worker(this, &RecvOverlapped::RecvWorker) {
-		memset(&m_overlapped, 0, sizeof(m_overlapped));
-		m_buffer.resize(1024 * 256);
-	}
+	RecvOverlapped();
 
 	int RecvWorker() {
-		// TODO
+		int ret = m_client->Recv();
+		return ret;
 	}
 };
-typedef RecvOverlapped<ERecv> RECVOVERLAPPED;
+
 
 template<MyOperator>
 class SendOverlapped : public MyOverlapped, ThreadFuncBase
 {
 public:
-	SendOverlapped() :m_operator(ESend), m_worker(this, &SendOverlapped::SendWorker) {
-		memset(&m_overlapped, 0, sizeof(m_overlapped));
-		m_buffer.resize(1024 * 256);
-	}
+	SendOverlapped();
 
 	int SendWorker() {
 		// TODO
+		return -1;
 	}
 };
-typedef SendOverlapped<ESend> SENDOVERLAPPED;
 
 template<MyOperator>
 class ErrorOverlapped : public MyOverlapped, ThreadFuncBase
@@ -78,36 +142,37 @@ public:
 
 	int ErrorWorker() {
 		// TODO
+		return -1;
 	}
 };
 typedef ErrorOverlapped<EError> ERROROVERLAPPED;
 
-class CMyServer :
-	public ThreadFuncBase
+class CMyServer : public ThreadFuncBase
 {
 public:
 	CMyServer(const std::string& ip = "0.0.0.0", short port = 9527) : m_pool(10) {
 		m_hIOCP = INVALID_HANDLE_VALUE;
-		m_sock = WSASocket(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+		m_sock = INVALID_SOCKET;
+		m_addr.sin_family = AF_INET;
+		m_addr.sin_port = htons(port);
+		m_addr.sin_addr.s_addr = inet_addr(ip.c_str());
+	}
 
-		int opt = 1;
-		setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+	~CMyServer() {}
 
-		sockaddr_in addr;
-		addr.sin_family = AF_INET;
-		addr.sin_port = htons(port);
-		addr.sin_addr.s_addr = inet_addr(ip.c_str());
+	bool StartService() {
+		CreateSocket();
 
-		if (bind(m_sock, (sockaddr*)&addr, sizeof(addr)) == -1) {
+		if (bind(m_sock, (sockaddr*)&m_addr, sizeof(m_addr)) == -1) {
 			closesocket(m_sock);
 			m_sock = INVALID_SOCKET;
-			return;
+			return false;
 		}
 
 		if (listen(m_sock, 3) == -1) {
 			closesocket(m_sock);
 			m_sock = INVALID_SOCKET;
-			return;
+			return false;
 		}
 
 		m_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 4);
@@ -115,67 +180,36 @@ public:
 			closesocket(m_sock);
 			m_sock = INVALID_SOCKET;
 			m_hIOCP = INVALID_HANDLE_VALUE;
-			return;
+			return false;
 		}
 
 		CreateIoCompletionPort((HANDLE)m_sock, m_hIOCP, (ULONG_PTR)this, 0);
 
+		m_pool.Invoke();
+
+		FUNCTYPE ptr = (FUNCTYPE)&CMyServer::threadIocp;
+
 		m_pool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
+
+		if (!NewAccept()) return false;
+
+		return true;
 	}
 
-	~CMyServer() {}
-
+	bool NewAccept();
 private:
-	int threadIocp() {
-		DWORD tranferred = 0;
-		ULONG_PTR CompletionKey = 0;
-		OVERLAPPED* lpOverlapped = NULL;
+	int threadIocp();
 
-		if (GetQueuedCompletionStatus(m_hIOCP, &tranferred, &CompletionKey, &lpOverlapped, INFINITE)) {
-			if (tranferred > 0 && CompletionKey != 0)
-			{
-				MyOverlapped* pOverlapped = CONTAINING_RECORD(lpOverlapped, MyOverlapped, m_overlapped);
-				switch (pOverlapped->m_operator) {
-				case EAccept:
-				{
-					ACCEPTOVERLAPPED* pOver = (ACCEPTOVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-				break;
-
-				case ERecv:
-				{
-					RECVOVERLAPPED* pOver = (RECVOVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-				break;
-
-				case ESend:
-				{
-					SENDOVERLAPPED* pOver = (SENDOVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-				break;
-
-				case EError:
-				{
-					ERROROVERLAPPED* pOver = (ERROROVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-				break;
-				}
-			}
-			else {
-				return -1;
-			}
-		}
-		return 0;
+	void CreateSocket() {
+		m_sock = WSASocket(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+		int opt = 1;
+		setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
 	}
 
 private:
 	MyThreadPool m_pool;
 	HANDLE m_hIOCP;
 	SOCKET m_sock;
-	std::map<SOCKET, std::shared_ptr< MyClient*>> m_client;
+	std::map<SOCKET, PCLIENT> m_client;
+	sockaddr_in m_addr;
 };
-

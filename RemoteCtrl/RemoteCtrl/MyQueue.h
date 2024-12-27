@@ -1,6 +1,7 @@
 #pragma once
 #include <list>
 #include <mutex>
+#include <atomic>
 #include "pch.h"
 // 线程安全的队列，利用IOCP实现
 template<class T>

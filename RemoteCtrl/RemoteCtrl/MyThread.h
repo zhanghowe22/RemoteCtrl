@@ -5,18 +5,20 @@
 #include <vector>
 #include <mutex>
 
-class ThreadFuncBase {};
+class ThreadFuncBase {
+public:
+};
 
-typedef int(ThreadFuncBase::* FUNCTYPE);
+typedef int(ThreadFuncBase::* FUNCTYPE)();
 
 class ThreadWorker
 {
 public:
-	ThreadWorker() :thiz(NULL), func(NULL) {}
+	ThreadWorker() : thiz(NULL), func(NULL) {};
 
 	ThreadWorker(ThreadFuncBase* obj, FUNCTYPE f) : thiz(obj), func(f) {}
 
-	ThreadWorker(const ThreadWorker& worker) {
+	ThreadWorker(const ThreadWorker& worker){
 		thiz = worker.thiz;
 		func = worker.func;
 	}
@@ -29,17 +31,18 @@ public:
 		return *this;
 	}
 
+	bool IsValid() const {
+		return (thiz != NULL) && (func != NULL);
+	}
+
 	int operator()() {
 		if (IsValid()) 
 		{
-			return (thiz->*func);
+			return (thiz->*func)();
 		}
 		return -1;
 	}
 
-	bool IsValid() {
-		return (thiz != NULL) && (func != NULL);
-	}
 
 private:
 	ThreadFuncBase* thiz;
@@ -75,16 +78,27 @@ public:
 	bool Stop() {
 		if (!m_bStatus) return true;
 		m_bStatus = false;
-		return WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
+		bool ret = WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
+		UpdateWorker();
+		return ret;
 	}
 
 	void UpdateWorker(const ::ThreadWorker& worker = ::ThreadWorker()) {
-		m_worker.store(worker);
+		if (!worker.IsValid()) {
+			m_worker.store(NULL);
+			return;
+		}
+		if (m_worker.load() != NULL) {
+			::ThreadWorker* pWorker = m_worker.load();
+			m_worker.store(NULL);
+			delete pWorker;
+		}
+		m_worker.store(new ::ThreadWorker(worker));
 	}
 
 	// true 表示空闲；false 表示已经分配了工作
 	bool IsIdle() { 
-		return !m_worker.load().IsValid();
+		return !m_worker.load()->IsValid();
 	}
 
 private:
@@ -98,7 +112,7 @@ private:
 
 	void ThreadWorker() {
 		while (m_bStatus) {
-			::ThreadWorker worker = m_worker.load();
+			::ThreadWorker worker = *m_worker.load();
 			if (worker.IsValid()) {
 				int ret = worker();
 				if (ret != 0) {
@@ -107,7 +121,7 @@ private:
 					OutputDebugString(str);
 				}
 				if (ret < 0) {
-					m_worker.store(::ThreadWorker());
+					m_worker.store(NULL);
 				}
 			}
 			else {
@@ -119,7 +133,7 @@ private:
 private:
 	HANDLE m_hThread;
 	bool m_bStatus; // true: 线程正在运行； false: 线程将要关闭
-	std::atomic<::ThreadWorker> m_worker;
+	std::atomic<::ThreadWorker*> m_worker;
 };
 
 // 线程池类
@@ -134,12 +148,15 @@ public:
 
 	MyThreadPool(size_t size) {
 		m_threads.resize(size);
+		for (size_t i = 0; i < size; i++) {
+			m_threads[i] = new CMyThread();
+		}
 	}
 
 	bool Invoke() {
 		bool ret = true;
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			if (m_threads[i].Start() == false) {
+			if (m_threads[i]->Start() == false) {
 				ret = false;
 				break;
 			}
@@ -147,7 +164,7 @@ public:
 
 		if (!ret) {
 			for (size_t i = 0; i < m_threads.size(); i++) {
-				m_threads[i].Stop();
+				m_threads[i]->Stop();
 			}
 		}
 		return ret;
@@ -155,7 +172,7 @@ public:
 
 	void Stop() {
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			m_threads[i].Stop();
+			m_threads[i]->Stop();
 		}
 	}
 
@@ -164,8 +181,8 @@ public:
 		int index = -1;
 		m_lock.lock();
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			if (m_threads[i].IsIdle()) {
-				m_threads[i].UpdateWorker(worker);
+			if (m_threads[i]->IsIdle()) {
+				m_threads[i]->UpdateWorker(worker);
 				index = i;
 				break;
 			}
@@ -177,13 +194,13 @@ public:
 	bool CheckThreadValid(size_t index) {
 		if (index < m_threads.size())
 		{
-			return m_threads[index].IsVaild();
+			return m_threads[index]->IsVaild();
 		}
 		return false;
 	}
 
 public:
 	std::mutex m_lock;
-	std::vector<CMyThread> m_threads;
+	std::vector<CMyThread*> m_threads;
 };
 

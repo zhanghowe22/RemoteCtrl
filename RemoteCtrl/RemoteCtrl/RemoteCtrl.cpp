@@ -8,6 +8,9 @@
 #include "CommonTool.h"
 #include <conio.h>
 #include "MyQueue.h"
+#include <winsock2.h>
+#include <mswsockdef.h>
+#include "MyServer.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -45,152 +48,13 @@ bool ChooseAutoInvoke(const CString& strPath) {
 	return true;
 }
 
-#define IOCP_LIST_EMPTY 0
-#define IOCP_LIST_PUSH 1
-#define IOCP_LIST_POP 2
-
-enum {
-	IocpListEmpty,
-	IocpListPush,
-	IocpListPop
-};
-
-
-typedef struct IocpParam {
-	int nOperator; // 操作
-	std::string strData; // 数据
-	_beginthread_proc_type cbFunc; // 回调
-
-	IocpParam(int op, const char* sData, _beginthread_proc_type cb = NULL) {
-		nOperator = op;
-		strData = sData;
-		cbFunc = cb;
-	}
-
-	IocpParam() {
-		nOperator = -1;
-	}
-
-}IOCP_PARAM;
-
-void threadMain(HANDLE hIOCP) {
-	std::list<std::string> lsString;
-	DWORD dwTransferred = 0;
-	ULONG_PTR completionKey = 0;
-	OVERLAPPED* pOverlAppend = NULL;
-	int count = 0, count0 = 0;
-
-	while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &completionKey, &pOverlAppend, INFINITE)) {
-		if ((dwTransferred == 0) || (completionKey == NULL)) {
-			printf("Thread is prepare to exit!\r\n");
-			break;
-		}
-		IOCP_PARAM* pParam = (IOCP_PARAM*)completionKey;
-		if (pParam->nOperator == IocpListPush) {
-			lsString.push_back(pParam->strData);
-			count0++;
-		}
-		else if (pParam->nOperator == IocpListPop) {
-			std::string* pStr = NULL;
-			if (lsString.size() > 0) {
-				pStr = new std::string(lsString.front());
-				lsString.pop_front();
-			}
-			if (pParam->cbFunc) {
-				pParam->cbFunc(pStr);
-			}
-			count++;
-		}
-		else if (pParam->nOperator == IocpListEmpty) {
-			lsString.clear();
-		}
-		delete pParam;
-	}
-	// lsString.clear();
-	printf("thread exit! count = %d count0 = %d\r\n", count, count0);
-}
-
-void threadQueueEntry(HANDLE hIOCP)
-{
-	threadMain(hIOCP);
-	_endthread(); // 代码到此为止，会导致本地对象无法调用析构，从而使得内存发生泄漏
-}
-
-void func(void* arg)
-{
-	std::string* pstr = (std::string*)arg;
-	if (pstr != NULL) {
-		printf("Pop from list: %s \r\n", pstr->c_str());
-		delete pstr;
-	}
-	else {
-		printf("List is empty, no data!\r\n");
-	}
-}
-
-void test() {
-	CMyQueue<std::string> lstStrings;
-	ULONGLONG tick0 = GetTickCount64(), tick = GetTickCount64(), total = GetTickCount64();
-
-	while (GetTickCount64() - total <= 1000) {
-		//if (GetTickCount64() - tick0 > 13) 
-		{
-			lstStrings.PushBack("hello world");
-			tick0 = GetTickCount64();
-		}
-	}
-	size_t count = lstStrings.Size();
-	printf("lstStrings push done! size = %d \r\n", count);
-	total = GetTickCount64();
-
-	while (GetTickCount64() - total <= 1000) { // 完成端口 把请求与实现分离开了
-
-		//if (GetTickCount64() - tick > 20) 
-		{
-			std::string str;
-			lstStrings.PopFront(str);
-			tick = GetTickCount64();
-			// printf("Pop from queue:%s\r\n", str.c_str());
-		}
-
-		// Sleep(1);
-	}
-	printf("lstStrings pop done! size = %d \r\n", count - lstStrings.Size());
-	lstStrings.Clear();
-
-	std::list<std::string> lstData;
-	total = GetTickCount64();
-	while (GetTickCount64() - total <= 1000)
-	{
-		lstData.push_back("hello world");
-	}
-	count = lstData.size();
-	printf("lstData push done! size = %d \r\n", count);
-
-	total = GetTickCount64();
-	while (GetTickCount64() - total <= 250)
-	{
-		if (lstData.size() > 0) {
-			lstData.pop_front();
-		}	
-	}
-	printf("lstData pop done! size = %d \r\n", (count - lstData.size()) * 4);
-}
-
-/*
-* 1 bug测试/功能测试 
-* 2 关键因素的测试（内存泄漏、运行的稳定性、条件性）
-* 3 压力测试（可靠性测试）
-* 4 性能测试
-*/
+void iocp();
 
 int main()
 {
 	if (!CCommonTool::Init()) return 1;
 
-	for (int i = 0; i < 10; i++) {
-		test();
-	}
+	iocp();
 
 	/*
 	if (CCommonTool::IsAdmin()) {
@@ -222,3 +86,23 @@ int main()
 	*/
 	return 0;
 }
+
+class COverlapped {
+public:
+	OVERLAPPED m_overlapped;
+	DWORD m_operator;
+	char m_buffer[4096];
+	COverlapped() {
+		m_operator = 0;
+		memset(&m_overlapped, 0, sizeof(m_overlapped));
+		memset(m_buffer, 0, sizeof(m_buffer));
+	}
+};
+
+void iocp()
+{
+	CMyServer server;
+	server.StartService();
+	getchar();
+}
+
