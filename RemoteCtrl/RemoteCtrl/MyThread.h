@@ -55,6 +55,7 @@ class CMyThread
 public:
 	CMyThread() {
 		m_hThread = NULL;
+		m_bStatus = false;
 	}
 
 	~CMyThread() {
@@ -98,6 +99,7 @@ public:
 
 	// true 表示空闲；false 表示已经分配了工作
 	bool IsIdle() { 
+		if (m_worker.load() == NULL) return true;
 		return !m_worker.load()->IsValid();
 	}
 
@@ -112,6 +114,10 @@ private:
 
 	void ThreadWorker() {
 		while (m_bStatus) {
+			if (m_worker.load() == NULL) {
+				Sleep(1);
+				continue;
+			}
 			::ThreadWorker worker = *m_worker.load();
 			if (worker.IsValid()) {
 				int ret = worker();

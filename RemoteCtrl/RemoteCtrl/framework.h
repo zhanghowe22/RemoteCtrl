@@ -9,7 +9,9 @@
 #ifndef VC_EXTRALEAN
 #define VC_EXTRALEAN            // 从 Windows 头文件中排除极少使用的内容
 #endif
-
+// 内存泄露检测工具 
+/* https://kinddragon.github.io/vld/ */
+//#include <vld.h>
 #include <afx.h>
 #include <afxwin.h>         // MFC 核心组件和标准组件
 #include <afxext.h>         // MFC 扩展

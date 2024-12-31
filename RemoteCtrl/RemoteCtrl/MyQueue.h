@@ -3,6 +3,9 @@
 #include <mutex>
 #include <atomic>
 #include "pch.h"
+#include "MyThread.h"
+
+
 // 线程安全的队列，利用IOCP实现
 template<class T>
 class CMyQueue
@@ -68,7 +71,7 @@ public:
 		return ret;
 	}
 
-	bool PopFront(T& data) {
+	virtual bool PopFront(T& data) {
 		HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 		IocpParam Param(MQPop, data, hEvent);
 		if (m_lock) {
@@ -118,14 +121,14 @@ public:
 		return ret;
 	}
 
-private:
+protected:
 	static void threadEntry(void* arg) {
 		CMyQueue<T>* thiz = (CMyQueue<T>*)arg;
 		thiz->threadMain();
 		_endthread();
 	}
 
-	void DealParam(PPARAM* pParam) {
+	virtual void DealParam(PPARAM* pParam) {
 		switch (pParam->nOperator)
 		{
 		case MQPush:
@@ -161,7 +164,7 @@ private:
 		}
 	}
 
-	void threadMain() {
+	virtual void threadMain() {
 		DWORD dwTransferred = 0;
 		PPARAM* pParam = NULL;
 		ULONG_PTR completionKey = 0;
@@ -195,10 +198,97 @@ private:
 		CloseHandle(hTemp);
 	}
 
-private:
+protected:
 	std::list<T> m_lstData;
 	HANDLE m_hCompeletionPort;
 	HANDLE m_hThread;
 	std::atomic<bool> m_lock; // 队列正在析构
-
 };
+
+
+
+template<class T>
+class MySendQueue : public CMyQueue<T>, public ThreadFuncBase {
+public:
+	typedef int (ThreadFuncBase::* MYCALLBACK) (T& data);
+
+	MySendQueue(ThreadFuncBase* obj, MYCALLBACK callback)
+		: CMyQueue<T>(), m_base(obj), m_callback(callback) 
+	{
+		m_thread.Start();
+		m_thread.UpdateWorker(::ThreadWorker(this, (FUNCTYPE)&MySendQueue<T>::threadTick));
+	}
+
+protected:
+	int threadTick() {
+		if (CMyQueue<T>::m_lstData.size() > 0) {
+			PopFront();
+		 }
+		Sleep(1);
+		return 0;
+	}
+
+	virtual bool PopFront(T& data) { 
+		return false;
+	}
+
+	bool PopFront()
+	{
+		typename CMyQueue<T>::IocpParam* Param = new typename CMyQueue<T>::IocpParam(CMyQueue<T>::MQPop, T());
+		if (CMyQueue<T>::m_lock) {
+			delete Param;
+			return false;
+		}
+		bool ret = PostQueuedCompletionStatus(CMyQueue<T>::m_hCompeletionPort, sizeof(*Param),
+			(ULONG_PTR)&Param, NULL);
+		if (ret == false) {
+			delete Param;
+			return false;
+		}
+		return ret;
+	}
+
+	virtual void DealParam(typename CMyQueue<T>::PPARAM* pParam) {
+		switch (pParam->nOperator)
+		{
+		case CMyQueue<T>::MQPush:
+			CMyQueue<T>::m_lstData.push_back(pParam->Data);
+			delete pParam;
+			break;
+
+		case CMyQueue<T>::MQPop:
+
+			if (CMyQueue<T>::m_lstData.size() > 0) {
+				pParam->Data = CMyQueue<T>::m_lstData.front();
+				if ((m_base->*m_callback)(pParam->Data) == 0) {
+					CMyQueue<T>::m_lstData.pop_front();
+				}	
+			}
+			delete pParam;
+			break;
+
+		case CMyQueue<T>::MQSize:
+			pParam->nOperator = CMyQueue<T>::m_lstData.size();
+			if (pParam->hEvent != NULL)
+				SetEvent(pParam->hEvent);
+			break;
+
+		case CMyQueue<T>::MQClear:
+			CMyQueue<T>::m_lstData.clear();
+			delete pParam;
+			break;
+
+		default:
+			OutputDebugStringA("Unknown operator!\r\n");
+			break;
+		}
+	}
+
+private:
+	ThreadFuncBase* m_base;
+	MYCALLBACK m_callback;
+	CMyThread m_thread;
+};
+
+
+typedef MySendQueue<std::vector<char>>::MYCALLBACK SENDCALLBACK;

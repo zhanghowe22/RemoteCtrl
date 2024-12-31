@@ -2,7 +2,9 @@
 #include <MSWSock.h>
 #include "MyThread.h"
 #include "MyQueue.h"
+#include "CommonTool.h"
 #include <map>
+#include <vector>
 
 enum MyOperator {
 	ENone,
@@ -35,7 +37,7 @@ typedef RecvOverlapped<ERecv> RECVOVERLAPPED;
 template<MyOperator>class SendOverlapped;
 typedef SendOverlapped<ESend> SENDOVERLAPPED;
 
-class MyClient {
+class MyClient : public ThreadFuncBase{
 public:
 	MyClient();
 
@@ -72,14 +74,11 @@ public:
 		return m_buffer.size();
 	}
 
-	int Recv() {
-		int ret = recv(m_sock, m_buffer.data() + m_used, m_buffer.size() - m_used, 0);
-		if (ret <= 0) return -1;
-		m_used += (size_t)ret;
-		// TODO: 解析数据
-		return 0;
-	}
+	int Recv();
 
+	int Send(void* buffer, size_t nSize);
+
+	int SendData(std::vector<char>& data);
 private:
 	SOCKET m_sock;
 	DWORD m_received;
@@ -92,6 +91,7 @@ private:
 	sockaddr_in m_raddr;
 	sockaddr_in m_laddr;
 	bool m_isbusy;
+	MySendQueue<std::vector<char>> m_vecSend; // 发送数据队列
 };
 
 template<MyOperator>
@@ -126,7 +126,10 @@ public:
 	SendOverlapped();
 
 	int SendWorker() {
-		// TODO
+		// TODO：
+		/*
+		* 1. send可能不会立即完成
+		*/
 		return -1;
 	}
 };
@@ -186,8 +189,6 @@ public:
 		CreateIoCompletionPort((HANDLE)m_sock, m_hIOCP, (ULONG_PTR)this, 0);
 
 		m_pool.Invoke();
-
-		FUNCTYPE ptr = (FUNCTYPE)&CMyServer::threadIocp;
 
 		m_pool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
 
