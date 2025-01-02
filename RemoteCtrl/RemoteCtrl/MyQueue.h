@@ -48,7 +48,7 @@ public:
 		}
 	}
 
-	~CMyQueue() {
+	virtual ~CMyQueue() {
 		if (m_lock) return;
 		m_lock = true;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
@@ -219,12 +219,19 @@ public:
 		m_thread.UpdateWorker(::ThreadWorker(this, (FUNCTYPE)&MySendQueue<T>::threadTick));
 	}
 
+	virtual ~MySendQueue() {
+		m_base = NULL;
+		m_callback = NULL;
+		m_thread.Stop();
+	}
+
 protected:
 	int threadTick() {
+		if (WaitForSingleObject(CMyQueue<T>::m_hThread, 0) != WAIT_TIMEOUT)
+			return 0;
 		if (CMyQueue<T>::m_lstData.size() > 0) {
-			PopFront();
+			PopFront(); 
 		 }
-		Sleep(1);
 		return 0;
 	}
 

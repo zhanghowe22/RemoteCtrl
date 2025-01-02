@@ -26,8 +26,11 @@ public:
 	std::vector<char> m_buffer; // 缓冲区
 	ThreadWorker m_worker; // 处理函数
 	CMyServer* m_server; // 服务器对象
-	PCLIENT m_client; // 对应的客户端
+	MyClient* m_client; // 对应的客户端
 	WSABUF m_wsabuffer;
+	virtual ~MyOverlapped() {
+		m_buffer.clear();
+	}
 };
 
 template<MyOperator>class AccpetOverlapped;
@@ -43,6 +46,11 @@ public:
 
 	~MyClient() {
 		closesocket(m_sock);
+		m_recv.reset();
+		m_send.reset();
+		m_overlapped.reset();
+		m_buffer.clear();
+		m_vecSend.Clear();
 	}
 
 	void SetOverlapped(PCLIENT& ptr);
@@ -101,8 +109,6 @@ public:
 	AccpetOverlapped();
 
 	int AcceptWorker();
-
-	PCLIENT m_client;
 };
 
 
@@ -161,7 +167,7 @@ public:
 		m_addr.sin_addr.s_addr = inet_addr(ip.c_str());
 	}
 
-	~CMyServer() {}
+	~CMyServer();
 
 	bool StartService() {
 		CreateSocket();

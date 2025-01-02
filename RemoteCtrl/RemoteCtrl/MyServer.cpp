@@ -15,7 +15,7 @@ AccpetOverlapped<op>::AccpetOverlapped() {
 template<MyOperator op>
 int AccpetOverlapped<op>::AcceptWorker() {
 	INT lLength = 0, rLength = 0;
-	if (*(LPDWORD)*m_client.get() > 0) {
+	if (*(LPDWORD)*m_client > 0) {
 		GetAcceptExSockaddrs(*m_client, 0,
 			sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16,
 			(sockaddr**)m_client->GetLocalAddr(), &lLength, // ±¾µØµØÖ·
@@ -49,9 +49,9 @@ MyClient::MyClient()
 }
 
 void MyClient::SetOverlapped(PCLIENT& ptr) {
-	m_overlapped->m_client = ptr;
-	m_recv = ptr->m_recv;
-	m_send = ptr->m_send;
+	m_overlapped->m_client = ptr.get();
+	m_recv->m_client = ptr.get();
+	m_send->m_client = ptr.get();
 }
 
 MyClient::operator LPOVERLAPPED()
@@ -98,6 +98,18 @@ int MyClient::SendData(std::vector<char>& data)
 		}
 	}
 	return 0;
+}
+
+CMyServer::~CMyServer()
+{
+	closesocket(m_sock);
+	std::map<SOCKET, PCLIENT>::iterator it = m_client.begin();
+	for (; it != m_client.end(); it++) {
+		it->second.reset();
+	}
+	m_client.clear();
+	CloseHandle(m_hIOCP);
+	m_pool.Stop();
 }
 
 bool CMyServer::NewAccept() {
