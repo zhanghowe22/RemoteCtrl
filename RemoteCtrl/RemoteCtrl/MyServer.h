@@ -71,7 +71,11 @@ public:
 
 	LPWSABUF RecvWSABuffer();
 
+	LPWSAOVERLAPPED RecvOverlapped();
+
 	LPWSABUF SendWSABuffer();
+
+	LPWSAOVERLAPPED SendOverlapped();
 
 	DWORD& flags() { return m_flags; }
 
@@ -204,14 +208,12 @@ public:
 	}
 
 	bool NewAccept();
+
+	void BindNewSocket(SOCKET s);
 private:
 	int threadIocp();
 
-	void CreateSocket() {
-		m_sock = WSASocket(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-		int opt = 1;
-		setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
-	}
+	void CreateSocket();
 
 private:
 	MyThreadPool m_pool;
