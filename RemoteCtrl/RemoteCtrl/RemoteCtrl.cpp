@@ -56,9 +56,19 @@ void udp_client(bool isHost = true);
 //int wmain(int argc, TCHAR* argv[]);
 //int _tmain(int argc, TCHAR* argv[]);
 
+void initsock() {
+	WSADATA wsa;
+	WSAStartup(MAKEWORD(2, 2), &wsa);
+}
+
+void clearsock() {
+	WSACleanup();
+}
+
 int main(int argc, char* argv[])
 {
 	if (!CCommonTool::Init()) return 1;
+	initsock();
 
 	if (argc == 1) { 
 		char wstrDir[MAX_PATH];
@@ -93,6 +103,8 @@ int main(int argc, char* argv[])
 	else { // 从客户端
 		udp_client(false);
 	}
+
+	clearsock();
 
 	// iocp();
 
@@ -146,16 +158,125 @@ void iocp()
 	getchar();
 }
 
-void udp_server() {
+void udp_server()
+{
 	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
-	getchar();
+	SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) {
+		printf("%s(%d):%s ERROR(%d)!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
+		return;
+	}
+
+	std::list<sockaddr_in> lstClients;
+
+	sockaddr_in server, client;
+	memset(&server, 0, sizeof(server));
+	memset(&client, 0, sizeof(client));
+
+	server.sin_family = AF_INET;
+	server.sin_port = htons(20000);
+	server.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	if (-1 == bind(sock, (sockaddr*)&server, sizeof(server))) {
+		printf("%s(%d):%s ERROR(%d)!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
+		closesocket(sock);
+		return;
+	}
+
+	std::string buf;
+	buf.resize(1024 * 256);
+	memset((char*)buf.c_str(), 0, buf.size());
+
+	int len = sizeof(client);
+	int ret = 0;
+	while (!_kbhit())
+	{
+		ret = recvfrom(sock, (char*)buf.c_str(), buf.size(), 0, (sockaddr*)&client, &len);
+		if (ret > 0) {
+			if (lstClients.size() <= 0) {
+				lstClients.push_back(client);
+				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+				ret = sendto(sock, buf.c_str(), ret, 0, (sockaddr*)&client, len);
+				printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+			}
+			else {
+				memcpy((void*)buf.c_str(), &lstClients.front(), sizeof(lstClients.front()));
+				ret = sendto(sock, buf.c_str(), sizeof(lstClients.front()), 0, (sockaddr*)&client, len);
+				printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+			}
+				
+			// CCommonTool::Dump((BYTE*)buf.c_str(), ret);
+		}
+		else {
+			printf("%s(%d):%s ERROR(%d) ret = %d!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+		}
+		Sleep(1);
+	}
+	
+	closesocket(sock);
+	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
-void udp_client(bool isHost) {
-	if (isHost) {
-		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
-	}	
-	else {
-		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+void udp_client(bool isHost)
+{
+	Sleep(2000);
+
+	sockaddr_in server, client;
+	int len = sizeof(client);
+	server.sin_family = AF_INET;
+	server.sin_port = htons(20000);
+	server.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) {
+		printf("%s(%d):%s ERROR!!!\r\n", __FILE__, __LINE__, __FUNCTION__);
+		return;
 	}
+
+	if (isHost) { // 主客户端代码
+		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+		std::string msg = "hello world!\n";
+		int ret = sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&server, sizeof(server));
+		printf("%s(%d):%s ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, ret);
+		if (ret > 0) {
+			msg.resize(1024);
+			memset((char*)msg.c_str(), 0, msg.size());
+			ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (sockaddr*)&client, &len);
+			printf("host %s(%d):%s ERROR(%d) ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+			if (ret > 0) {
+				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+				printf("%s(%d):%s msg = %d\r\n", __FILE__, __LINE__, __FUNCTION__, msg.size());
+			}
+			ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (sockaddr*)&client, &len);
+			printf("host %s(%d):%s ERROR(%d) ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+			if (ret > 0) {
+				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+				printf("%s(%d):%s msg = %s\r\n", __FILE__, __LINE__, __FUNCTION__, msg.c_str());
+			}
+		}
+	}	
+	else { // 从客户端代码
+		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+		std::string msg = "hello world!\n";
+		int ret = sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&server, sizeof(server));
+		printf("%s(%d):%s ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, ret);
+		if (ret > 0) {
+			msg.resize(1024);
+			memset((char*)msg.c_str(), 0, msg.size());
+			ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (sockaddr*)&client, &len);
+			printf("client %s(%d):%s ERROR(%d) ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+			if (ret > 0) {
+				sockaddr_in addr;
+				memcpy(&addr, msg.c_str(), sizeof(addr));
+				sockaddr_in* paddr = (sockaddr_in*)&addr;
+				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+				printf("%s(%d):%s msg = %d\r\n", __FILE__, __LINE__, __FUNCTION__, msg.size());
+				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, inet_ntoa(paddr->sin_addr), ntohs(paddr->sin_port));
+				msg = "hello, i am client!\r\n";
+				ret = sendto(sock, (char*)msg.c_str(), msg.size(), 0, (sockaddr*)paddr, sizeof(sockaddr_in));
+				printf("client %s(%d):%s ERROR(%d) ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+			}
+		}
+	}
+	closesocket(sock);
 }
