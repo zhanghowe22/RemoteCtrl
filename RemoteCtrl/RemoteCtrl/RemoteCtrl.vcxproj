@@ -158,6 +158,7 @@
   <ItemGroup>
     <ClInclude Include="Command.h" />
     <ClInclude Include="CommonTool.h" />
+    <ClInclude Include="ESocket.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="LockDialog.h" />
     <ClInclude Include="MyQueue.h" />
