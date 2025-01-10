@@ -72,8 +72,6 @@ public:
 	}
 
 	inline int size() const { return sizeof(sockaddr_in); }
-
-
 private:
 	sockaddr_in m_addr;
 	std::string m_ip;
@@ -88,7 +86,10 @@ public:
 	}
 
 	EBuffer(size_t size = 0) :std::string() {
-		if (size > 0) resize(size);
+		if (size > 0) {
+			resize(size);
+			memset(*this, 0, this->size());
+		}
 	}
 
 	EBuffer(void* buffer, size_t size) : std::string() {
@@ -104,6 +105,11 @@ public:
 	operator const char* () const { return c_str(); }
 	operator BYTE* () const { return (BYTE*)c_str(); }
 	operator void* () const { return (void*)c_str(); }
+
+	void Update(void* buffer, size_t size) {
+		resize(size);
+		memcpy((void*)c_str(), buffer, size);
+	}
 
 };
 
@@ -124,7 +130,7 @@ public:
 	}
 
 	~ESocket() {
-		closesocket(m_socket);
+		close();
 	}
 
 	ESocket operator=(const ESocket& sock) {
@@ -172,7 +178,18 @@ public:
 
 	int recvfrom(EBuffer& buffer, ESockaddrIn& from) {
 		int len = from.size();
-		return ::recvfrom(m_socket, buffer, buffer.size(), 0, from, &len);
+		int ret = ::recvfrom(m_socket, buffer, buffer.size(), 0, from, &len);
+		if (ret > 0) {
+			from.update();
+		}
+		return ret;
+	}
+
+	void close() {
+		if (m_socket != INVALID_SOCKET) {
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+		}
 	}
 
 private:

@@ -158,6 +158,7 @@
   <ItemGroup>
     <ClInclude Include="Command.h" />
     <ClInclude Include="CommonTool.h" />
+    <ClInclude Include="ENetwork.h" />
     <ClInclude Include="ESocket.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="LockDialog.h" />
@@ -174,6 +175,7 @@
   <ItemGroup>
     <ClCompile Include="Command.cpp" />
     <ClCompile Include="CommonTool.cpp" />
+    <ClCompile Include="ENetwork.cpp" />
     <ClCompile Include="LockDialog.cpp" />
     <ClCompile Include="MyServer.cpp" />
     <ClCompile Include="pch.cpp">

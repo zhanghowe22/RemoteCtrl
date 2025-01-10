@@ -11,7 +11,6 @@
 #include <winsock2.h>
 #include <mswsockdef.h>
 #include "MyServer.h"
-#include "ESocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -163,58 +162,39 @@ void iocp()
 *	a. 简化参数
 *	b. 类型适配（参数适配）
 *	c. 流程简化
+* 2 易移植性（高内聚、低耦合）
+*	a. 
 */
+#include "ENetwork.h"
+
+int RecvFromCB(void* arg, const EBuffer& buffer, ESockaddrIn& addr) 
+{
+	EServer* server = (EServer*)arg;
+	return server->Sendto(addr, buffer);
+}
+
+int SendToCB(void* arg, const ESockaddrIn& addr, int ret) 
+{
+	EServer* server = (EServer*)arg;
+	printf("Sendto done! %d\r\n", server);
+	return 0;
+}
 
 void udp_server()
 {
-	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
-	ESOCKET sock(new ESocket(ETYPE::ETypeUDP));
-	if (*sock == INVALID_SOCKET) {
-		printf("%s(%d):%s ERROR(%d)!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
-		return;
-	}
-
 	std::list<ESockaddrIn> lstClients;
 
-	ESockaddrIn client;
+	EServerParameter param(
+		"127.0.0.1", 20000, ETYPE::ETypeUDP, NULL, NULL, NULL, RecvFromCB, SendToCB
+	);
 
-	if (-1 == sock->bind("127.0.0.1", 20000)) {
-		printf("%s(%d):%s ERROR(%d)!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
-		return;
-	}
+	EServer server(param);
 
-	std::string buf;
-	buf.resize(1024 * 256);
-	memset((char*)buf.c_str(), 0, buf.size());
+	server.Invoke(&server);
 
-	int len = sizeof(client);
-	int ret = 0;
-	while (!_kbhit())
-	{
-		ret = recvfrom(*sock, (char*)buf.c_str(), buf.size(), 0, client, &len);
-		if (ret > 0) {
-			if (lstClients.size() <= 0) {
-				client.update();
-				lstClients.push_back(client);
-				printf("%s(%d):%s - ip: %s port: %d\r\n", __FILE__, __LINE__, __FUNCTION__, client.GetIP().c_str(), client.GetPort());
-				ret = sendto(*sock, buf.c_str(), ret, 0, client, len);
-				printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
-			}
-			else {
-				memcpy((void*)buf.c_str(), lstClients.front(), lstClients.front().size());
-				ret = sendto(*sock, buf.c_str(), lstClients.front().size(), 0, client, client.size());
-				printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
-			}
-				
-			// CCommonTool::Dump((BYTE*)buf.c_str(), ret);
-		}
-		else {
-			printf("%s(%d):%s ERROR(%d) ret = %d!!!\r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
-		}
-		Sleep(1);
-	}
-	
 	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+	getchar();
+	return;
 }
 
 void udp_client(bool isHost)
@@ -280,3 +260,11 @@ void udp_client(bool isHost)
 	}
 	closesocket(sock);
 }
+
+/*
+* 1. 思路：实现一个需求的过程
+*	确定需求（阶段性的）、选定技术方案（依据技术点）、从框架开发到细节实现（从顶到底）、编译问题、
+*	内存泄露（线程结束、exit函数）、bug排查与功能调试（日志、断点、线程、调用堆栈、内存、监视、局部变量、自动变量）、
+*	压力测试（额外写代码）、功能上线
+* 2 设计：易用性、移植性（可复用性）、安全性、稳定性（鲁棒性）、可扩展性
+*/
