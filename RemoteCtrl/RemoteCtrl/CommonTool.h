@@ -1,8 +1,9 @@
 #pragma once
+// 公共工具类
 class CCommonTool
 {
 public:
-	// 输出数据的内容
+	// DUMP 输出数据的内容
 	static void Dump(BYTE* pData, size_t nSize) {
 
 		std::string strOut;
@@ -139,7 +140,7 @@ public:
 			wprintf(L"错误: GetModuleHandle 失败\n");
 			return false;
 		}
-
+		// 设置MFC运行环境
 		if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
 		{
 			// TODO: 在此处为应用程序的行为编写代码。

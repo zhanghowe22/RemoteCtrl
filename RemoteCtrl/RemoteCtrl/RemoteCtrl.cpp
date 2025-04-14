@@ -56,6 +56,7 @@ void udp_client(bool isHost = true);
 //int wmain(int argc, TCHAR* argv[]);
 //int _tmain(int argc, TCHAR* argv[]);
 
+// 初始化windows套接字
 void initsock() {
 	WSADATA wsa;
 	WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -70,6 +71,8 @@ int main(int argc, char* argv[])
 	if (!CCommonTool::Init()) return 1;
 	initsock();
 
+	// 无参数 -> 开启主客户端 -> 开启从客户端 -> 服务端
+
 	if (argc == 1) { 
 		char wstrDir[MAX_PATH];
 		GetCurrentDirectoryA(MAX_PATH, wstrDir);
@@ -79,6 +82,7 @@ int main(int argc, char* argv[])
 		memset(&pi, 0, sizeof(pi));
 		string strCmd = argv[0];
 		strCmd += " 1";
+		// 使用CreateProcessA创建一个新的进程 ，第二个参数相当于新的进程的命令行为 argv[0] 1,所以会进入下面的else if分支
 		BOOL bRet = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, wstrDir, &si, &pi);
 		if (bRet) {
 			CloseHandle(pi.hThread);
@@ -199,26 +203,31 @@ void udp_server()
 
 void udp_client(bool isHost)
 {
-	Sleep(2000);
+	// 等待服务器就绪
+	Sleep(2000); 
 
+	// 设置服务器地址和端口
 	sockaddr_in server, client;
 	int len = sizeof(client);
 	server.sin_family = AF_INET;
 	server.sin_port = htons(20000);
 	server.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+	// 创建UDP套接字
 	SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
 	if (sock == INVALID_SOCKET) {
 		printf("%s(%d):%s ERROR!!!\r\n", __FILE__, __LINE__, __FUNCTION__);
 		return;
 	}
 
+	// UDP打洞
 	if (isHost) { // 主客户端代码
-		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
 		EBuffer msg = "hello world!\n";
 		int ret = sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&server, sizeof(server));
 		printf("%s(%d):%s ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, ret);
+
 		if (ret > 0) {
+			// TODO: 为什么要从服务端两次接收数据
 			msg.resize(1024);
 			memset((char*)msg.c_str(), 0, msg.size());
 			ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (sockaddr*)&client, &len);
@@ -236,7 +245,6 @@ void udp_client(bool isHost)
 		}
 	}	
 	else { // 从客户端代码
-		printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
 		std::string msg = "hello world!\n";
 		int ret = sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&server, sizeof(server));
 		printf("%s(%d):%s ret = %d\r\n", __FILE__, __LINE__, __FUNCTION__, ret);
